@@ -1,0 +1,32 @@
+text: "На вас напали разбойники! Они требуют кошелёк или жизнь."
+is_goal_event: false
+tags:
+  - travel
+choices:
+  - text: "Сразиться"
+    outcomes:
+      - text: "Вы ранены и ограблены."
+        success_level: fail
+      - text: "Вы отбились, но потеряли часть вещей."
+        success_level: neutral
+      - text: "Вы одержали блестящую победу! О вашей храбрости заговорят."
+        success_level: success
+        goal_achieved: fame
+  - text: "Убежать"
+    outcomes:
+      - text: "Вы споткнулись и упали, разбойники настигли вас."
+        success_level: fail
+      - text: "Вам удалось скрыться, но вы сбились с пути."
+        success_level: neutral
+      - text: "Вы убежали и наткнулись на спрятанный клад!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Откупиться"
+    outcomes:
+      - text: "Разбойники забрали всё и оставили вас без гроша."
+        success_level: fail
+      - text: "Они взяли плату и отпустили вас."
+        success_level: neutral
+      - text: "Они оказались бывшими солдатами и взяли вас в свою компанию, открыв новые возможности."
+        success_level: success
+        goal_achieved: adventure

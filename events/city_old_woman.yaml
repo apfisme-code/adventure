@@ -1,0 +1,31 @@
+text: "К вам подходит старая женщина и говорит, что знает тайну, которая изменит вашу жизнь."
+is_goal_event: false
+tags:
+  - city
+choices:
+  - text: "Выслушать её"
+    outcomes:
+      - text: "Она оказалась сумасшедшей, вы потеряли время."
+        success_level: fail
+      - text: "Она рассказала легенду, которая позже пригодилась."
+        success_level: neutral
+      - text: "Она открыла вам путь к великому приключению!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Дать ей монету"
+    outcomes:
+      - text: "Она взяла монету и исчезла, ничего не сказав."
+        success_level: fail
+      - text: "Она поблагодарила и дала совет."
+        success_level: neutral
+      - text: "Она оказалась феей и исполнила ваше желание – вы отправились в захватывающее путешествие!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Пройти мимо"
+    outcomes:
+      - text: "Ничего не произошло."
+        success_level: neutral
+      - text: "Ничего не произошло."
+        success_level: neutral
+      - text: "Она крикнула вам вслед пророчество, которое сбылось."
+        success_level: success

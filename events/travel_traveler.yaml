@@ -1,0 +1,32 @@
+text: "На дороге вы встречаете путника, который предлагает вам сделку: он даст вам карту сокровищ в обмен на вашу самую ценную вещь."
+is_goal_event: false
+tags:
+  - travel
+choices:
+  - text: "Согласиться"
+    outcomes:
+      - text: "Карта оказалась фальшивкой, вы потеряли вещь."
+        success_level: fail
+      - text: "Карта привела к небольшому кладу, вы не в выигрыше, но и не в убытке."
+        success_level: neutral
+      - text: "Карта привела к огромному сокровищу! Вы стали сказочно богаты."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Отказаться и расспросить его"
+    outcomes:
+      - text: "Он обиделся и ушёл, больше вы его не видели."
+        success_level: fail
+      - text: "Он рассказал вам интересные истории о дальних землях."
+        success_level: neutral
+      - text: "Он оказался странствующим рыцарем и позвал вас в поход за приключениями!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Украсть карту"
+    outcomes:
+      - text: "Вы попытались украсть, но путник оказался ловким и обезвредил вас."
+        success_level: fail
+      - text: "Вы украли карту, но она оказалась бесполезной."
+        success_level: neutral
+      - text: "Вы не только украли карту, но и получили приглашение в тайное общество – ваше имя прогремело!"
+        success_level: success
+        goal_achieved: fame

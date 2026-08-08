@@ -1,0 +1,32 @@
+text: "Вы подходите к мосту, который охраняет огромный тролль. Он требует ответить на загадку."
+is_goal_event: false
+tags:
+  - travel
+choices:
+  - text: "Попытаться разгадать загадку"
+    outcomes:
+      - text: "Вы ошиблись, тролль сбросил вас в реку."
+        success_level: fail
+      - text: "Вы ответили правильно, но тролль пропустил вас без особого восторга."
+        success_level: neutral
+      - text: "Ваш ответ поразил тролля, он назвал вас мудрейшим и пропустил, ваша слава растёт."
+        success_level: success
+        goal_achieved: fame
+  - text: "Попробовать договориться"
+    outcomes:
+      - text: "Тролль рассердился и прогнал вас."
+        success_level: fail
+      - text: "Он согласился пропустить вас за небольшую плату."
+        success_level: neutral
+      - text: "Вы заключили выгодную сделку, которая принесла вам богатство."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Обойти мост вброд"
+    outcomes:
+      - text: "Вы увязли в болоте и потеряли время."
+        success_level: fail
+      - text: "Вы перешли реку, но промокли и простудились."
+        success_level: neutral
+      - text: "Вброд вы нашли древний артефакт, который открыл вам тайну."
+        success_level: success
+        goal_achieved: adventure

@@ -1,0 +1,31 @@
+text: "В городе большой праздник! Все веселятся, и вас приглашают принять участие."
+is_goal_event: false
+tags:
+  - city
+choices:
+  - text: "Выступить с песней"
+    outcomes:
+      - text: "Засмеяли, вы опозорены."
+        success_level: fail
+      - text: "Публика аплодирует, но вскоре забывает о вас."
+        success_level: neutral
+      - text: "Ваше выступление прославило вас на весь город!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Помочь в организации"
+    outcomes:
+      - text: "Всё пошло не по плану, вы навлекли гнев горожан."
+        success_level: fail
+      - text: "Помогли, но остались незамеченным."
+        success_level: neutral
+      - text: "Благодаря вам праздник удался, ваше имя у всех на устах!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Тихо наслаждаться"
+    outcomes:
+      - text: "Никто не обратил внимания."
+        success_level: neutral
+      - text: "Вы хорошо провели время."
+        success_level: neutral
+      - text: "Вы встретили интересного человека, который рассказал вам много нового."
+        success_level: success

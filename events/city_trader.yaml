@@ -1,0 +1,31 @@
+text: "Вы встречаете странствующего торговца. Он предлагает вам редкий товар."
+is_goal_event: false
+tags:
+  - city
+choices:
+  - text: "Купить товар"
+    outcomes:
+      - text: "Товар оказался подделкой, вы потеряли деньги."
+        success_level: fail
+      - text: "Товар среднего качества, вы остались при своих."
+        success_level: neutral
+      - text: "Вы купили настоящий клад! Ваше богатство растёт."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Попросить совет"
+    outcomes:
+      - text: "Торговец обманул вас, вы попали в ловушку."
+        success_level: fail
+      - text: "Он дал полезный совет, вы узнали новое."
+        success_level: neutral
+      - text: "Совет привёл вас к сокровищам! Вы стали богаты."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Уйти, не вступая в разговор"
+    outcomes:
+      - text: "Вы ушли, ничего не случилось."
+        success_level: neutral
+      - text: "Вы ушли, ничего не случилось."
+        success_level: neutral
+      - text: "Вы ушли, но торговец окликнул вас и подарил карту."
+        success_level: success
