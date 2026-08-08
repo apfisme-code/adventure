@@ -1,0 +1,33 @@
+text: "На берегу вы встречаете торговца с экзотическими товарами с дальних островов."
+is_goal_event: false
+tags:
+  - travel
+  - море
+choices:
+  - text: "Купить редкий жемчуг"
+    outcomes:
+      - text: "Жемчуг оказался подделкой из ракушек."
+        success_level: fail
+      - text: "Жемчуг красив, но не имеет ценности."
+        success_level: neutral
+      - text: "Это был настоящий чёрный жемчуг, вы продали его за целое состояние!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Наняться к нему матросом"
+    outcomes:
+      - text: "Вы оказались плохим матросом, вас высадили на необитаемом острове."
+        success_level: fail
+      - text: "Вы проплыли некоторое время, но ничего интересного не случилось."
+        success_level: neutral
+      - text: "Вы стали капитаном собственного судна, и ваше имя гремит на всех морях!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Спросить о пиратских сокровищах"
+    outcomes:
+      - text: "Торговец солгал и отправил вас в опасное место."
+        success_level: fail
+      - text: "Он рассказал старую историю, но без подробностей."
+        success_level: neutral
+      - text: "Он дал вам карту острова с сокровищами – вперёд за приключениями!"
+        success_level: success
+        goal_achieved: adventure

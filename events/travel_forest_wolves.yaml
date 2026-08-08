@@ -1,0 +1,33 @@
+text: "Стая голодных волков преграждает вам путь. Они рычат и готовятся напасть."
+is_goal_event: false
+tags:
+  - travel
+  - лес
+choices:
+  - text: "Вступить в бой"
+    outcomes:
+      - text: "Волки одолели вас, вы тяжело ранены."
+        success_level: fail
+      - text: "Вы отбились, но потеряли часть припасов."
+        success_level: neutral
+      - text: "Вы проявили невероятную храбрость и одолели вожака стаи. Ваша слава растёт!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Попытаться убежать"
+    outcomes:
+      - text: "Вы споткнулись и упали, волки вас окружили."
+        success_level: fail
+      - text: "Вам удалось убежать, но вы очень устали."
+        success_level: neutral
+      - text: "Убегая, вы нашли пещеру с сокровищами – удача на вашей стороне!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Использовать факел, чтобы отпугнуть волков"
+    outcomes:
+      - text: "Факел погас, и волки напали."
+        success_level: fail
+      - text: "Волки испугались и отступили, но факел сгорел."
+        success_level: neutral
+      - text: "Волки разбежались, и вы заметили тропу, ведущую к неизведанным землям – начало приключений!"
+        success_level: success
+        goal_achieved: adventure

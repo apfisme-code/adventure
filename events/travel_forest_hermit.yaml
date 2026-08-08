@@ -1,0 +1,33 @@
+text: "В чаще леса вы натыкаетесь на хижину отшельника. Он приглашает вас войти."
+is_goal_event: false
+tags:
+  - travel
+  - лес
+choices:
+  - text: "Принять приглашение"
+    outcomes:
+      - text: "Отшельник оказался злым колдуном, вы едва сбежали."
+        success_level: fail
+      - text: "Он угостил вас травяным чаем и рассказал пару легенд."
+        success_level: neutral
+      - text: "Он подарил вам амулет, который приносит удачу в приключениях!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Уйти, не входя"
+    outcomes:
+      - text: "Вы прошли мимо, ничего не случилось."
+        success_level: neutral
+      - text: "Вы услышали странный шум, но это был просто ветер."
+        success_level: neutral
+      - text: "Ветка упала рядом и открыла тайник с монетами – вы разбогатели!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Попросить совета у отшельника"
+    outcomes:
+      - text: "Он дал вам ложный совет, вы заблудились."
+        success_level: fail
+      - text: "Совет оказался нейтральным, но не бесполезным."
+        success_level: neutral
+      - text: "Он указал путь к древнему храму, где вас ждёт слава и богатство!"
+        success_level: success
+        goal_achieved: fame

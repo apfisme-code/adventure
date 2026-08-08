@@ -1,0 +1,33 @@
+text: "Вы стоите перед величественным дворцом. Стража у ворот, а изнутри доносится музыка."
+is_goal_event: false
+tags:
+  - city
+  - столица
+choices:
+  - text: "Попросить аудиенции у короля"
+    outcomes:
+      - text: "Король был в плохом настроении и приказал выгнать вас."
+        success_level: fail
+      - text: "Король выслушал вас, но не проявил интереса."
+        success_level: neutral
+      - text: "Ваше выступление так понравилось королю, что он назначил вас советником! Слава и богатство."
+        success_level: success
+        goal_achieved: fame
+  - text: "Пробраться в сад дворца"
+    outcomes:
+      - text: "Вас поймала стража и бросила в темницу."
+        success_level: fail
+      - text: "Вы погуляли в саду, но ничего не нашли."
+        success_level: neutral
+      - text: "В саду вы нашли волшебный цветок, который принёс вам удачу и богатство."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Принять участие в рыцарском турнире"
+    outcomes:
+      - text: "Вы проиграли в первом же бою."
+        success_level: fail
+      - text: "Вы выиграли пару схваток, но не стали чемпионом."
+        success_level: neutral
+      - text: "Вы стали победителем турнира! Вся столица говорит о вашем подвиге, вы знамениты!"
+        success_level: success
+        goal_achieved: fame

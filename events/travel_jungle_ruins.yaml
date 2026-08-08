@@ -1,0 +1,33 @@
+text: "Среди густых джунглей вы находите древние руины, покрытые лианами."
+is_goal_event: false
+tags:
+  - travel
+  - джунгли
+choices:
+  - text: "Исследовать руины"
+    outcomes:
+      - text: "Вы наткнулись на ловушку и получили травму."
+        success_level: fail
+      - text: "Вы нашли несколько старых монет, но ничего ценного."
+        success_level: neutral
+      - text: "Внутри вы обнаружили золотую статую! Вы стали очень богаты."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Нарисовать план руин"
+    outcomes:
+      - text: "Ваш план оказался неточным, и вы потеряли время."
+        success_level: fail
+      - text: "План пригодился местным археологам, вас поблагодарили."
+        success_level: neutral
+      - text: "Ваша карта стала известна во всём мире, ваше имя прославилось!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Поискать вход в подземелье"
+    outcomes:
+      - text: "Вы провалились в яму и застряли."
+        success_level: fail
+      - text: "Вы нашли подземный ход, но он был завален."
+        success_level: neutral
+      - text: "Подземелье привело к древнему храму, где вас ждут великие приключения!"
+        success_level: success
+        goal_achieved: adventure

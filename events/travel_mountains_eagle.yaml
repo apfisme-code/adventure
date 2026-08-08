@@ -1,0 +1,33 @@
+text: "В небе парит огромный орёл. Он спускается и садится на соседний утёс, глядя на вас."
+is_goal_event: false
+tags:
+  - travel
+  - горы
+choices:
+  - text: "Попытаться подойти к орлу"
+    outcomes:
+      - text: "Орёл атаковал и ранил вас."
+        success_level: fail
+      - text: "Орёл позволил вам приблизиться, но улетел."
+        success_level: neutral
+      - text: "Орёл оказался посланником богов, и он подарил вам перо, приносящее удачу в приключениях!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Покормить орла мясом из запасов"
+    outcomes:
+      - text: "Орёл не принял еду и улетел."
+        success_level: neutral
+      - text: "Орёл съел мясо и улетел, ничего не дав."
+        success_level: neutral
+      - text: "Орёл принёс вам золотое кольцо, которое принадлежало древнему королю – вы стали богаты!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Попытаться заговорить с орлом (использовать свисток)"
+    outcomes:
+      - text: "Свисток напугал орла, он улетел."
+        success_level: neutral
+      - text: "Орёл издал странный звук, но вы не поняли его."
+        success_level: neutral
+      - text: "Орёл привёл вас к гнезду, где вы нашли древний свиток с секретами славы – ваше имя прогремело!"
+        success_level: success
+        goal_achieved: fame

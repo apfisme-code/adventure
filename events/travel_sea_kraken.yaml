@@ -1,0 +1,33 @@
+text: "Внезапно из воды поднимается огромный кракен! Он угрожает вашему кораблю."
+is_goal_event: false
+tags:
+  - travel
+  - море
+choices:
+  - text: "Атаковать кракена"
+    outcomes:
+      - text: "Кракен разбил корабль, вы едва спаслись на обломках."
+        success_level: fail
+      - text: "Вы нанесли ему несколько ран, и он отступил, но корабль серьёзно повреждён."
+        success_level: neutral
+      - text: "Вы победили кракена! О вашем подвиге слагают легенды, вы знамениты!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Попытаться договориться с ним"
+    outcomes:
+      - text: "Кракен не понял вас и атаковал."
+        success_level: fail
+      - text: "Кракен заинтересовался и пропустил вас, но взял дань."
+        success_level: neutral
+      - text: "Вы нашли общий язык с кракеном, и он указал вам путь к затонувшему сокровищу – вы разбогатеете!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Сбежать на полной скорости"
+    outcomes:
+      - text: "Кракен догнал вас и потопил корабль."
+        success_level: fail
+      - text: "Вам удалось уйти, но вы потеряли часть груза."
+        success_level: neutral
+      - text: "Убегая, вы наткнулись на неисследованный остров, где вас ждут приключения."
+        success_level: success
+        goal_achieved: adventure

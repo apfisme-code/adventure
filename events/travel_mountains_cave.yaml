@@ -1,0 +1,33 @@
+text: "В скалах вы замечаете тёмный вход в пещеру. Из неё веет холодом и тайнами."
+is_goal_event: false
+tags:
+  - travel
+  - горы
+choices:
+  - text: "Войти в пещеру"
+    outcomes:
+      - text: "Пещера обрушилась, вы с трудом выбрались."
+        success_level: fail
+      - text: "Вы нашли лишь старые кости и ничего ценного."
+        success_level: neutral
+      - text: "Внутри вы обнаружили драгоценные камни и сокровища! Богатство!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Крикнуть в пещеру, чтобы проверить эхо"
+    outcomes:
+      - text: "Эхо привлекло внимание пещерного медведя, вы едва убежали."
+        success_level: fail
+      - text: "Эхо было красивым, но ничего не произошло."
+        success_level: neutral
+      - text: "Эхо пробудило духа гор, который предложил вам испытание – за победу вы получите славу и приключения!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Оставить метку и пойти дальше"
+    outcomes:
+      - text: "Вы потеряли метку и заблудились."
+        success_level: fail
+      - text: "Вы отметили пещеру, но не вернулись к ней."
+        success_level: neutral
+      - text: "Позже вы узнали, что эта пещера вела к подземному королевству – вас ждут великие приключения!"
+        success_level: success
+        goal_achieved: adventure

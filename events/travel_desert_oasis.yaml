@@ -1,0 +1,33 @@
+text: "Вы находите оазис посреди пустыни. Тень, вода и пальмы – настоящий рай."
+is_goal_event: false
+tags:
+  - travel
+  - пустыня
+choices:
+  - text: "Напиться и отдохнуть"
+    outcomes:
+      - text: "Вода была отравлена, вы почувствовали себя плохо."
+        success_level: fail
+      - text: "Вы отдохнули, и силы восстановились."
+        success_level: neutral
+      - text: "На дне источника вы нашли золотую монету, а рядом – клад! Богатство."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Осмотреть пальмы"
+    outcomes:
+      - text: "С пальмы упал кокос и ударил вас по голове."
+        success_level: fail
+      - text: "Вы собрали несколько фруктов, но ничего особенного."
+        success_level: neutral
+      - text: "На пальме вы заметили древнюю надпись, указывающую путь к легендарному городу – приключение начинается!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Разбить лагерь на ночь"
+    outcomes:
+      - text: "Ночью напали скорпионы, вы были ужалены."
+        success_level: fail
+      - text: "Вы спокойно переночевали, утром продолжили путь."
+        success_level: neutral
+      - text: "Во сне к вам пришёл дух пустыни и открыл секрет вечной славы – ваше имя будет жить вечно!"
+        success_level: success
+        goal_achieved: fame

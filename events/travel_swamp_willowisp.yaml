@@ -1,0 +1,33 @@
+text: "Ночью на болоте вы видите странные огни, танцующие над водой. Говорят, это души путников."
+is_goal_event: false
+tags:
+  - travel
+  - болото
+choices:
+  - text: "Пойти на огни"
+    outcomes:
+      - text: "Огни завели вас в трясину, вы едва не утонули."
+        success_level: fail
+      - text: "Вы подошли, но огни исчезли, ничего не произошло."
+        success_level: neutral
+      - text: "Огни привели вас к старому кладбищу, где вы нашли древний артефакт, приносящий богатство."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Игнорировать и продолжать путь"
+    outcomes:
+      - text: "Вы попали в болотную яму, потеряли время."
+        success_level: fail
+      - text: "Вы спокойно прошли мимо, но ничего не нашли."
+        success_level: neutral
+      - text: "Внезапно под ногами вы нашли сундук с монетами – удача!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Попытаться поймать огонь сетью"
+    outcomes:
+      - text: "Сеть загорелась, вы обожгли руки."
+        success_level: fail
+      - text: "Вы поймали светлячка, но это был просто жук."
+        success_level: neutral
+      - text: "Огонь оказался духом, который поблагодарил вас и указал путь к приключениям!"
+        success_level: success
+        goal_achieved: adventure

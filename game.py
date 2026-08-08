@@ -2,13 +2,14 @@ import random
 import os
 import glob
 import yaml
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple, Set
 
 # ------------------- Модели данных -------------------
 
 class City:
-    def __init__(self, name: str):
+    def __init__(self, name: str, tag: str):
         self.name = name
+        self.tag = tag          # 'деревня', 'небольшой город', 'столица'
         self.neighbors: List['City'] = []
 
     def add_neighbor(self, other: 'City'):
@@ -36,10 +37,14 @@ class Choice:
 
 
 class Event:
-    def __init__(self, text: str, choices: List[Choice], is_goal_event: bool = False):
+    def __init__(self, text: str, choices: List[Choice], tags: List[str], is_goal_event: bool = False):
         self.text = text
         self.choices = choices
+        self.tags = tags
         self.is_goal_event = is_goal_event
+
+    def matches_place(self, place_tags: Set[str]) -> bool:
+        return all(tag in place_tags for tag in self.tags)
 
 
 # ------------------- Загрузчик событий из файлов -------------------
@@ -71,6 +76,7 @@ class EventLoader:
         try:
             text = data["text"]
             is_goal = data.get("is_goal_event", False)
+            tags = data.get("tags", [])
             choices_data = data.get("choices", [])
             choices = []
             for choice_item in choices_data:
@@ -79,10 +85,10 @@ class EventLoader:
                 outcomes = []
                 for out in outcomes_data:
                     level = out["success_level"]
-                    goal = out.get("goal_achieved")  # может отсутствовать
+                    goal = out.get("goal_achieved")
                     outcomes.append(Outcome(out["text"], level, goal))
                 choices.append(Choice(choice_text, outcomes))
-            return Event(text, choices, is_goal)
+            return Event(text, choices, tags, is_goal)
         except KeyError as e:
             print(f"Ошибка в данных события: отсутствует поле {e}")
             return None
@@ -97,7 +103,7 @@ class Player:
     def __init__(self, start_city: City, goal: str):
         self.current_city = start_city
         self.goal = goal
-        self.progress = 0  # счётчик прогресса от 0 до 100
+        self.progress = 0
         self.history: List[Dict] = []
         self.game_over = False
 
@@ -125,13 +131,17 @@ class Player:
 class Game:
     def __init__(self, loader: EventLoader):
         self.loader = loader
-        self.cities = self._build_map()
+        self.cities, self.edge_tags = self._build_map()
         self.player = None
+        self.current_edge_tag = None
         self.goals = ['wealth', 'fame', 'adventure']
         self.goal_names = {'wealth': 'Богатство', 'fame': 'Известность', 'adventure': 'Приключения'}
 
-    def _build_map(self) -> Dict[str, City]:
-        cities = {name: City(name) for name in ['A', 'B', 'C', 'D', 'E', 'F', 'G']}
+    def _build_map(self) -> Tuple[Dict[str, City], Dict[Tuple[str, str], str]]:
+        city_tags = ['деревня', 'деревня', 'деревня', 'небольшой город', 'небольшой город', 'столица', 'столица']
+        random.shuffle(city_tags)
+        cities = {name: City(name, tag) for name, tag in zip(['A', 'B', 'C', 'D', 'E', 'F', 'G'], city_tags)}
+
         edges = [
             ('A', 'B'), ('A', 'C'), ('A', 'D'),
             ('B', 'C'), ('B', 'E'), ('B', 'F'),
@@ -140,17 +150,28 @@ class Game:
             ('E', 'F'), ('E', 'G'),
             ('F', 'G')
         ]
+        terrain_tags = ['лес', 'болото', 'море', 'джунгли', 'пустыня', 'горы']
+        edge_tags = {}
         for u, v in edges:
+            tag = random.choice(terrain_tags)
+            key = tuple(sorted((u, v)))
+            edge_tags[key] = tag
             cities[u].add_neighbor(cities[v])
             cities[v].add_neighbor(cities[u])
-        return cities
+
+        return cities, edge_tags
+
+    def get_edge_tag(self, city1: City, city2: City) -> Optional[str]:
+        key = tuple(sorted((city1.name, city2.name)))
+        return self.edge_tags.get(key)
 
     def start(self):
         start_city = random.choice(list(self.cities.values()))
         goal = random.choice(self.goals)
         self.player = Player(start_city, goal)
+        self.current_edge_tag = None
         print(f"Добро пожаловать в игру-путешествие по сказочному миру!")
-        print(f"Вы начинаете в городе {start_city.name}.")
+        print(f"Вы начинаете в городе {start_city.name} (тип: {start_city.tag}).")
         print(f"Ваша цель: {self.goal_names[goal]}.")
         print("Вы должны набрать 100 очков прогресса, совершая успешные действия в рамках вашей цели.")
         print("Каждый успех прибавляет 1 очко. Путешествуйте и создавайте свою историю!\n")
@@ -198,12 +219,13 @@ class Game:
         print(f"Цель: {self.goal_names[self.player.goal]} достигнута на {self.player.progress}%.")
 
     def show_status(self):
-        print(f"\n--- Текущий город: {self.player.current_city.name} ---")
+        print(f"\n--- Текущий город: {self.player.current_city.name} (тип: {self.player.current_city.tag}) ---")
         print(f"Прогресс к цели: {self.player.progress}/100")
         neighbors = self.player.current_city.neighbors
         print("Доступные направления:")
         for i, city in enumerate(neighbors):
-            print(f"  {i+1}. {city.name}")
+            edge_tag = self.get_edge_tag(self.player.current_city, city)
+            print(f"  {i+1}. {city.name} ({city.tag}) - путь через {edge_tag}")
 
     def handle_move(self):
         neighbors = self.player.current_city.neighbors
@@ -212,6 +234,7 @@ class Game:
                 choice = int(input("Выберите номер города для перехода: "))
                 if 1 <= choice <= len(neighbors):
                     target = neighbors[choice-1]
+                    self.current_edge_tag = self.get_edge_tag(self.player.current_city, target)
                     self.player.move_to(target)
                     break
                 else:
@@ -220,13 +243,23 @@ class Game:
                 print("Введите число.")
 
     def handle_travel_event(self):
-        event = random.choice(self.travel_events)
-        print(f"\n[В пути] {event.text}")
+        if self.current_edge_tag is None:
+            return
+        place_tags = {"travel", self.current_edge_tag}
+        suitable = [ev for ev in self.travel_events if ev.matches_place(place_tags)]
+        if not suitable:
+            return
+        event = random.choice(suitable)
+        print(f"\n[В пути через {self.current_edge_tag}] {event.text}")
         self.process_event(event, "travel")
 
     def handle_city_event(self):
-        event = random.choice(self.city_events)
-        print(f"\n[Город] {event.text}")
+        place_tags = {"city", self.player.current_city.tag}
+        suitable = [ev for ev in self.city_events if ev.matches_place(place_tags)]
+        if not suitable:
+            return
+        event = random.choice(suitable)
+        print(f"\n[Город {self.player.current_city.name} ({self.player.current_city.tag})] {event.text}")
         self.process_event(event, "city")
 
     def process_event(self, event: Event, event_type: str):
@@ -246,7 +279,6 @@ class Game:
         outcome = chosen_choice.resolve()
         print(f"Результат: {outcome.text}")
 
-        # Проверяем, совпадает ли goal_achieved с целью игрока
         progress_gained = 0
         if outcome.goal_achieved == self.player.goal:
             self.player.add_progress(1)

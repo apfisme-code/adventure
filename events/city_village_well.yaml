@@ -1,0 +1,33 @@
+text: "Вы подходите к старому колодцу в центре деревни. Местные говорят, что он исполняет желания, но цена может быть высокой."
+is_goal_event: false
+tags:
+  - city
+  - деревня
+choices:
+  - text: "Бросить монету и загадать желание"
+    outcomes:
+      - text: "Монета упала на дно, но ничего не произошло."
+        success_level: neutral
+      - text: "Вода забурлила, и вам показалось видение, но оно быстро исчезло."
+        success_level: neutral
+      - text: "Из колодца вылез дух и подарил вам амулет удачи! Ваше богатство растёт."
+        success_level: success
+        goal_achieved: wealth
+  - text: "Спросить у старушки, сидящей рядом"
+    outcomes:
+      - text: "Старушка оказалась глухой и ничего не ответила."
+        success_level: neutral
+      - text: "Она рассказала старую легенду, которая вам пригодится."
+        success_level: neutral
+      - text: "Она оказалась хранительницей тайн и открыла вам путь к сокровищам!"
+        success_level: success
+        goal_achieved: adventure
+  - text: "Попытаться выпить воды"
+    outcomes:
+      - text: "Вода оказалась горькой, вы почувствовали тошноту."
+        success_level: fail
+      - text: "Вы утолили жажду, но ничего не случилось."
+        success_level: neutral
+      - text: "Вода придала вам сил, и вы почувствовали прилив вдохновения – ваша слава растёт."
+        success_level: success
+        goal_achieved: fame

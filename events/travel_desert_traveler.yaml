@@ -1,0 +1,33 @@
+text: "В пустыне вы встречаете караван торговцев, которые направляются в оазис."
+is_goal_event: false
+tags:
+  - travel
+  - пустыня
+choices:
+  - text: "Присоединиться к каравану"
+    outcomes:
+      - text: "Караван попал в песчаную бурю, вы потерялись."
+        success_level: fail
+      - text: "Вы дошли с ними до оазиса, но ничего не произошло."
+        success_level: neutral
+      - text: "Торговцы рассказали вам о затерянном городе, и вы нашли там несметные сокровища!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Предложить им свои услуги в качестве охраны"
+    outcomes:
+      - text: "На вас напали разбойники, вы не справились."
+        success_level: fail
+      - text: "Вы отогнали пару шакалов, но это было легко."
+        success_level: neutral
+      - text: "Вы героически защитили караван от бандитов, и ваша слава разнеслась по пустыне!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Купить у них воду и отправиться дальше"
+    outcomes:
+      - text: "Вода оказалась солёной, вы чуть не умерли от жажды."
+        success_level: fail
+      - text: "Вода была нормальной, вы продолжили путь."
+        success_level: neutral
+      - text: "Торговец дал вам волшебный компас, который приведёт вас к величайшему приключению!"
+        success_level: success
+        goal_achieved: adventure

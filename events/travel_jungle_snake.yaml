@@ -1,0 +1,33 @@
+text: "С дерева свешивается огромная змея. Она шипит и готовится к броску."
+is_goal_event: false
+tags:
+  - travel
+  - джунгли
+choices:
+  - text: "Сразиться со змеёй"
+    outcomes:
+      - text: "Змея укусила вас, вы отравились."
+        success_level: fail
+      - text: "Вы убили змею, но её яд оказался бесполезен."
+        success_level: neutral
+      - text: "Вы победили змею и обнаружили под ней гнездо с драгоценными камнями – богатство!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Попытаться обойти змею"
+    outcomes:
+      - text: "Змея заметила вас и укусила за ногу."
+        success_level: fail
+      - text: "Вы прошли, но змея следовала за вами некоторое время."
+        success_level: neutral
+      - text: "Обходя змею, вы нашли редкое растение, которое вылечило короля, и вас наградили славой!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Использовать дым, чтобы отпугнуть змею"
+    outcomes:
+      - text: "Дым привлёк ещё больше змей."
+        success_level: fail
+      - text: "Змея уползла, и вы продолжили путь."
+        success_level: neutral
+      - text: "Дым рассеялся, и вы увидели вход в тайную пещеру, полную приключений."
+        success_level: success
+        goal_achieved: adventure

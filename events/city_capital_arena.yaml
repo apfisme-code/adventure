@@ -1,0 +1,33 @@
+text: "На арене столицы сегодня бои гладиаторов. Зрители жаждут зрелищ."
+is_goal_event: false
+tags:
+  - city
+  - столица
+choices:
+  - text: "Выйти на арену в качестве бойца"
+    outcomes:
+      - text: "Вы были жестоко избиты и едва выжили."
+        success_level: fail
+      - text: "Вы показали неплохой бой, но проиграли."
+        success_level: neutral
+      - text: "Вы одержали несколько побед, и толпа носит вас на руках! Вы легенда!"
+        success_level: success
+        goal_achieved: fame
+  - text: "Заключить пари на исход боя"
+    outcomes:
+      - text: "Вы проиграли все деньги."
+        success_level: fail
+      - text: "Вы остались при своих – никто не выиграл."
+        success_level: neutral
+      - text: "Вы угадали исход и удвоили своё состояние!"
+        success_level: success
+        goal_achieved: wealth
+  - text: "Поговорить с организатором"
+    outcomes:
+      - text: "Организатор грубо отмахнулся от вас."
+        success_level: neutral
+      - text: "Он рассказал о подпольных боях, но вы не заинтересовались."
+        success_level: neutral
+      - text: "Он предложил вам участвовать в тайных приключениях за пределами арены – это начало большого путешествия!"
+        success_level: success
+        goal_achieved: adventure
