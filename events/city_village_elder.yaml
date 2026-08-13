@@ -1,0 +1,46 @@
+text: "Старейшина деревни созывает собрание. Он ищет смельчака для опасного поручения."
+is_goal_event: false
+tags:
+  - city
+  - деревня
+requires: []
+choices:
+  - text: "Вызваться добровольцем"
+    requires: ["фехтовальщик"]   # только для умелых бойцов
+    outcomes:
+      - text: "Вы не справились с заданием и подвели всех."
+        success_level: fail
+        status_changes: {"знаменитый": false}
+      - text: "Вы выполнили задание, но без особой благодарности."
+        success_level: neutral
+        status_changes: {}
+      - text: "Вы блестяще справились, и деревня прославила вас как героя!"
+        success_level: success
+        goal_achieved: fame
+        status_changes: {"знаменитый": true}
+  - text: "Отказаться, но предложить помощь советом"
+    requires: ["красноречивый"]   # требуется красноречие
+    outcomes:
+      - text: "Старейшина обиделся и прогнал вас."
+        success_level: fail
+        status_changes: {"красноречивый": false}
+      - text: "Ваш совет оказался полезным, вас похвалили."
+        success_level: neutral
+        status_changes: {}
+      - text: "Ваш план привёл к великой победе, и вы получили долю сокровищ!"
+        success_level: success
+        goal_achieved: wealth
+        status_changes: {"богатый": true}
+  - text: "Тайком уйти, не участвуя"
+    requires: []   # доступно всем
+    outcomes:
+      - text: "Вас заметили и объявили трусом."
+        success_level: fail
+        status_changes: {"знаменитый": false}
+      - text: "Никто не обратил внимания на ваше исчезновение."
+        success_level: neutral
+        status_changes: {}
+      - text: "Вы наткнулись на заброшенный склад, где нашли карту к приключениям."
+        success_level: success
+        goal_achieved: adventure
+        status_changes: {"взломщик": true}

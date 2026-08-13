@@ -3,31 +3,44 @@ is_goal_event: false
 tags:
   - travel
   - болото
+requires: []   # доступно всем
 choices:
   - text: "Попросить у неё зелье"
+    requires: []   # доступно всем
     outcomes:
       - text: "Зелье оказалось ядом, вы чуть не умерли."
         success_level: fail
+        status_changes: {}
       - text: "Она дала вам зелье от усталости, вы почувствовали себя лучше."
         success_level: neutral
+        status_changes: {}
       - text: "Зелье придало вам невиданной силы, вы совершили подвиг, и о вас заговорили."
         success_level: success
         goal_achieved: fame
+        status_changes: {"знаменитый": true}
   - text: "Украсть у неё книгу заклинаний"
+    requires: ["взломщик"]   # требуется навык взлома
     outcomes:
       - text: "Ведьма поймала вас и превратила в лягушку (временно)."
         success_level: fail
+        status_changes: {}
       - text: "Вы украли книгу, но она оказалась на непонятном языке."
         success_level: neutral
+        status_changes: {}
       - text: "В книге вы нашли карту сокровищ и отправились на поиски – богатство гарантировано!"
         success_level: success
         goal_achieved: wealth
+        status_changes: {"богатый": true}
   - text: "Вызвать её на состязание в мудрости"
+    requires: ["мудрый"]   # требуется мудрость
     outcomes:
       - text: "Ведьма задала неразрешимую загадку, вы проиграли."
         success_level: fail
+        status_changes: {"мудрый": false}  # потеря мудрости
       - text: "Вы ответили правильно, но ведьма ушла, не сказав ничего."
         success_level: neutral
+        status_changes: {}
       - text: "Вы превзошли ведьму в мудрости, и она открыла вам тайный вход в подземный мир – ждите приключений!"
         success_level: success
         goal_achieved: adventure
+        status_changes: {"мудрый": true, "знаменитый": true}

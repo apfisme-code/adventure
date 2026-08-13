@@ -3,31 +3,44 @@ is_goal_event: false
 tags:
   - city
   - столица
+requires: []
 choices:
   - text: "Попросить аудиенции у короля"
+    requires: ["красноречивый"]   # нужно уметь говорить
     outcomes:
       - text: "Король был в плохом настроении и приказал выгнать вас."
         success_level: fail
+        status_changes: {"красноречивый": false}
       - text: "Король выслушал вас, но не проявил интереса."
         success_level: neutral
+        status_changes: {}
       - text: "Ваше выступление так понравилось королю, что он назначил вас советником! Слава и богатство."
         success_level: success
         goal_achieved: fame
+        status_changes: {"знаменитый": true, "богатый": true}
   - text: "Пробраться в сад дворца"
+    requires: ["взломщик"]   # нужно уметь проникать
     outcomes:
       - text: "Вас поймала стража и бросила в темницу."
         success_level: fail
+        status_changes: {"взломщик": false}
       - text: "Вы погуляли в саду, но ничего не нашли."
         success_level: neutral
+        status_changes: {}
       - text: "В саду вы нашли волшебный цветок, который принёс вам удачу и богатство."
         success_level: success
         goal_achieved: wealth
+        status_changes: {"богатый": true}
   - text: "Принять участие в рыцарском турнире"
+    requires: ["фехтовальщик"]   # нужен боевой навык
     outcomes:
       - text: "Вы проиграли в первом же бою."
         success_level: fail
+        status_changes: {"фехтовальщик": false}
       - text: "Вы выиграли пару схваток, но не стали чемпионом."
         success_level: neutral
+        status_changes: {}
       - text: "Вы стали победителем турнира! Вся столица говорит о вашем подвиге, вы знамениты!"
         success_level: success
         goal_achieved: fame
+        status_changes: {"знаменитый": true}

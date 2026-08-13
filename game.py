@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any, Tuple, Set
 class City:
     def __init__(self, name: str, tag: str):
         self.name = name
-        self.tag = tag          # 'деревня', 'небольшой город', 'столица'
+        self.tag = tag
         self.neighbors: List['City'] = []
 
     def add_neighbor(self, other: 'City'):
@@ -21,27 +21,32 @@ class City:
 
 
 class Outcome:
-    def __init__(self, text: str, success_level: str, goal_achieved: Optional[str] = None):
+    def __init__(self, text: str, success_level: str, goal_achieved: Optional[str] = None,
+                 status_changes: Optional[Dict[str, bool]] = None):
         self.text = text
         self.success_level = success_level
         self.goal_achieved = goal_achieved
+        self.status_changes = status_changes or {}
 
 
 class Choice:
-    def __init__(self, text: str, outcomes: List[Outcome]):
+    def __init__(self, text: str, outcomes: List[Outcome], requires: Optional[List[str]] = None):
         self.text = text
         self.outcomes = outcomes
+        self.requires = requires or []
 
     def resolve(self) -> Outcome:
         return random.choice(self.outcomes)
 
 
 class Event:
-    def __init__(self, text: str, choices: List[Choice], tags: List[str], is_goal_event: bool = False):
+    def __init__(self, text: str, choices: List[Choice], tags: List[str],
+                 is_goal_event: bool = False, requires: Optional[List[str]] = None):
         self.text = text
         self.choices = choices
         self.tags = tags
         self.is_goal_event = is_goal_event
+        self.requires = requires or []
 
     def matches_place(self, place_tags: Set[str]) -> bool:
         return all(tag in place_tags for tag in self.tags)
@@ -77,18 +82,21 @@ class EventLoader:
             text = data["text"]
             is_goal = data.get("is_goal_event", False)
             tags = data.get("tags", [])
+            requires = data.get("requires", [])
             choices_data = data.get("choices", [])
             choices = []
             for choice_item in choices_data:
                 choice_text = choice_item["text"]
+                choice_requires = choice_item.get("requires", [])
                 outcomes_data = choice_item.get("outcomes", [])
                 outcomes = []
                 for out in outcomes_data:
                     level = out["success_level"]
                     goal = out.get("goal_achieved")
-                    outcomes.append(Outcome(out["text"], level, goal))
-                choices.append(Choice(choice_text, outcomes))
-            return Event(text, choices, tags, is_goal)
+                    changes = out.get("status_changes", {})
+                    outcomes.append(Outcome(out["text"], level, goal, changes))
+                choices.append(Choice(choice_text, outcomes, choice_requires))
+            return Event(text, choices, tags, is_goal, requires)
         except KeyError as e:
             print(f"Ошибка в данных события: отсутствует поле {e}")
             return None
@@ -104,6 +112,7 @@ class Player:
         self.current_city = start_city
         self.goal = goal
         self.progress = 0
+        self.statuses: Set[str] = set()
         self.history: List[Dict] = []
         self.game_over = False
 
@@ -111,7 +120,9 @@ class Player:
         self.current_city = city
         self.history.append({"action": "move", "to": city.name})
 
-    def add_event_record(self, event_type: str, event: Event, choice: Choice, outcome: Outcome, progress_gained: int = 0):
+    def add_event_record(self, event_type: str, event: Event, choice: Choice,
+                         outcome: Outcome, progress_gained: int = 0,
+                         status_changes: Optional[Dict[str, bool]] = None):
         self.history.append({
             "type": event_type,
             "event": event.text,
@@ -119,13 +130,24 @@ class Player:
             "outcome": outcome.text,
             "success_level": outcome.success_level,
             "goal_achieved": outcome.goal_achieved,
-            "progress_gained": progress_gained
+            "progress_gained": progress_gained,
+            "status_changes": status_changes or {}
         })
 
     def add_progress(self, amount: int = 1):
         self.progress = min(100, self.progress + amount)
         if self.progress >= 100:
             self.game_over = True
+
+    def apply_status_changes(self, changes: Dict[str, bool]):
+        for status, add in changes.items():
+            if add:
+                self.statuses.add(status)
+            else:
+                self.statuses.discard(status)
+
+    def has_statuses(self, required: List[str]) -> bool:
+        return all(s in self.statuses for s in required)
 
 
 class Game:
@@ -165,11 +187,26 @@ class Game:
         key = tuple(sorted((city1.name, city2.name)))
         return self.edge_tags.get(key)
 
+    def get_available_events(self, events: List[Event]) -> List[Event]:
+        return [ev for ev in events if self.player.has_statuses(ev.requires)]
+
+    def get_available_choices(self, choices: List[Choice]) -> List[Choice]:
+        return [ch for ch in choices if self.player.has_statuses(ch.requires)]
+
+    def print_statuses(self, prefix: str = "Текущие статусы"):
+        """Выводит текущие статусы игрока."""
+        if self.player.statuses:
+            print(f"{prefix}: {', '.join(sorted(self.player.statuses))}")
+        else:
+            print(f"{prefix}: нет")
+
     def start(self):
         start_city = random.choice(list(self.cities.values()))
         goal = random.choice(self.goals)
         self.player = Player(start_city, goal)
+        self.player.statuses.add("красноречивый")  # начальный бонус
         self.current_edge_tag = None
+
         print(f"Добро пожаловать в игру-путешествие по сказочному миру!")
         print(f"Вы начинаете в городе {start_city.name} (тип: {start_city.tag}).")
         print(f"Ваша цель: {self.goal_names[goal]}.")
@@ -207,6 +244,7 @@ class Game:
         else:
             print("Игра прервана. Вы не достигли цели.")
         print(f"Итоговый прогресс: {self.player.progress}/100")
+        self.print_statuses("Финальные статусы")
         print("Ваш путь:")
         for record in self.player.history:
             if record.get("action") == "move":
@@ -216,11 +254,20 @@ class Game:
                 print(f"    Выбор: {record['choice']} -> {record['outcome']} ({record['success_level']})")
                 if record.get("progress_gained", 0) > 0:
                     print(f"    Прогресс +{record['progress_gained']}")
+                if record.get("status_changes"):
+                    changes = record["status_changes"]
+                    added = [s for s, v in changes.items() if v]
+                    removed = [s for s, v in changes.items() if not v]
+                    if added:
+                        print(f"    Получены статусы: {', '.join(added)}")
+                    if removed:
+                        print(f"    Потеряны статусы: {', '.join(removed)}")
         print(f"Цель: {self.goal_names[self.player.goal]} достигнута на {self.player.progress}%.")
 
     def show_status(self):
         print(f"\n--- Текущий город: {self.player.current_city.name} (тип: {self.player.current_city.tag}) ---")
         print(f"Прогресс к цели: {self.player.progress}/100")
+        self.print_statuses()
         neighbors = self.player.current_city.neighbors
         print("Доступные направления:")
         for i, city in enumerate(neighbors):
@@ -236,6 +283,8 @@ class Game:
                     target = neighbors[choice-1]
                     self.current_edge_tag = self.get_edge_tag(self.player.current_city, target)
                     self.player.move_to(target)
+                    print(f"\nВы перешли в {target.name}.")
+                    self.print_statuses("Ваши статусы после перемещения")
                     break
                 else:
                     print("Неверный номер. Попробуйте снова.")
@@ -246,30 +295,41 @@ class Game:
         if self.current_edge_tag is None:
             return
         place_tags = {"travel", self.current_edge_tag}
-        suitable = [ev for ev in self.travel_events if ev.matches_place(place_tags)]
-        if not suitable:
+        candidates = [ev for ev in self.travel_events if ev.matches_place(place_tags)]
+        available = self.get_available_events(candidates)
+        if not available:
+            print(f"Нет подходящих событий в пути через {self.current_edge_tag}.")
             return
-        event = random.choice(suitable)
+        event = random.choice(available)
         print(f"\n[В пути через {self.current_edge_tag}] {event.text}")
         self.process_event(event, "travel")
 
     def handle_city_event(self):
         place_tags = {"city", self.player.current_city.tag}
-        suitable = [ev for ev in self.city_events if ev.matches_place(place_tags)]
-        if not suitable:
+        candidates = [ev for ev in self.city_events if ev.matches_place(place_tags)]
+        available = self.get_available_events(candidates)
+        if not available:
+            print(f"Нет подходящих событий в городе {self.player.current_city.name}.")
             return
-        event = random.choice(suitable)
+        event = random.choice(available)
         print(f"\n[Город {self.player.current_city.name} ({self.player.current_city.tag})] {event.text}")
         self.process_event(event, "city")
 
     def process_event(self, event: Event, event_type: str):
-        for i, choice in enumerate(event.choices):
-            print(f"  {i+1}. {choice.text}")
+        available_choices = self.get_available_choices(event.choices)
+        if not available_choices:
+            print("Нет доступных вариантов для ваших статусов. Событие пропущено.")
+            return
+
+        for i, choice in enumerate(available_choices):
+            req_str = f" (требуется: {', '.join(choice.requires)})" if choice.requires else ""
+            print(f"  {i+1}. {choice.text}{req_str}")
+
         while True:
             try:
                 idx = int(input("Ваш выбор (номер): ")) - 1
-                if 0 <= idx < len(event.choices):
-                    chosen_choice = event.choices[idx]
+                if 0 <= idx < len(available_choices):
+                    chosen_choice = available_choices[idx]
                     break
                 else:
                     print("Неверный номер.")
@@ -279,13 +339,31 @@ class Game:
         outcome = chosen_choice.resolve()
         print(f"Результат: {outcome.text}")
 
+        # Применяем изменения статусов и выводим их
+        if outcome.status_changes:
+            # Запоминаем старые статусы для вывода изменений
+            old_statuses = set(self.player.statuses)
+            self.player.apply_status_changes(outcome.status_changes)
+            new_statuses = self.player.statuses
+
+            added = new_statuses - old_statuses
+            removed = old_statuses - new_statuses
+            if added:
+                print(f"Получены статусы: {', '.join(sorted(added))}")
+            if removed:
+                print(f"Потеряны статусы: {', '.join(sorted(removed))}")
+            self.print_statuses("Обновлённые статусы")
+        else:
+            self.print_statuses("Ваши статусы")
+
         progress_gained = 0
         if outcome.goal_achieved == self.player.goal:
             self.player.add_progress(1)
             progress_gained = 1
             print(f"Прогресс +1! (текущий: {self.player.progress}/100)")
 
-        self.player.add_event_record(event_type, event, chosen_choice, outcome, progress_gained)
+        self.player.add_event_record(event_type, event, chosen_choice, outcome,
+                                     progress_gained, outcome.status_changes)
 
         if self.player.progress >= 100:
             print("Поздравляем! Вы достигли 100 очков прогресса и выполнили свою цель!")
