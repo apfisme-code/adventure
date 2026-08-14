@@ -6,41 +6,38 @@ tags:
 requires: []
 choices:
   - text: "Вызваться добровольцем"
-    requires: ["фехтовальщик"]   # только для умелых бойцов
+    requires: [{"фехтование": "==true"}]   # нужно уметь фехтовать
     outcomes:
-      - text: "Вы не справились с заданием и подвели всех."
+      - text: "Вы не справились и подвели всех."
         success_level: fail
-        status_changes: {"знаменитый": false}
+        status_changes: {"известность": -1}
       - text: "Вы выполнили задание, но без особой благодарности."
         success_level: neutral
         status_changes: {}
-      - text: "Вы блестяще справились, и деревня прославила вас как героя!"
+      - text: "Вы блестяще справились, и деревня прославила вас!"
         success_level: success
-        goal_achieved: fame
-        status_changes: {"знаменитый": true}
+        status_changes: {"известность": 2}
   - text: "Отказаться, но предложить помощь советом"
-    requires: ["красноречивый"]   # требуется красноречие
+    requires: [{"мудрость": ">=2"}]
     outcomes:
       - text: "Старейшина обиделся и прогнал вас."
         success_level: fail
-        status_changes: {"красноречивый": false}
+        status_changes: {"мудрость": -1}
       - text: "Ваш совет оказался полезным, вас похвалили."
         success_level: neutral
-        status_changes: {}
-      - text: "Ваш план привёл к великой победе, и вы получили долю сокровищ!"
+        status_changes: {"мудрость": 1}
+      - text: "Ваш план привёл к победе, и вы получили долю сокровищ!"
         success_level: success
-        goal_achieved: wealth
-        status_changes: {"богатый": true}
+        status_changes: {"богатство": 3}
   - text: "Тайком уйти, не участвуя"
-    requires: []   # доступно всем
+    requires: [{"взлом": "==true"}]
     outcomes:
       - text: "Вас заметили и объявили трусом."
         success_level: fail
-        status_changes: {"знаменитый": false}
-      - text: "Никто не обратил внимания на ваше исчезновение."
+        status_changes: {"известность": -1}
+      - text: "Никто не обратил внимания."
         success_level: neutral
         status_changes: {}
-      - text: "Вы наткнулись на заброшенный склад, где нашли карту к приключениям."
+      - text: "Вы наткнулись на заброшенный склад с картой."
         success_level: success
-        goal_achieved: adventure
-        status_changes: {"взломщик": true}
+        status_changes: {"взлом": false}   # потеряли навык? (или оставить true)

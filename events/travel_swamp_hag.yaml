@@ -1,46 +1,43 @@
-text: "На болоте вы встречаете старую ведьму, которая варит зелье в большом котле."
+text: "На болоте вы встречаете старую ведьму, которая варит зелье."
 is_goal_event: false
 tags:
   - travel
   - болото
-requires: []   # доступно всем
+requires: []
 choices:
   - text: "Попросить у неё зелье"
-    requires: []   # доступно всем
+    requires: []
     outcomes:
       - text: "Зелье оказалось ядом, вы чуть не умерли."
         success_level: fail
-        status_changes: {}
-      - text: "Она дала вам зелье от усталости, вы почувствовали себя лучше."
+        status_changes: {"мудрость": -1}
+      - text: "Она дала зелье от усталости."
         success_level: neutral
-        status_changes: {}
-      - text: "Зелье придало вам невиданной силы, вы совершили подвиг, и о вас заговорили."
+        status_changes: {"мудрость": 1}
+      - text: "Зелье придало вам силы, вы совершили подвиг."
         success_level: success
-        goal_achieved: fame
-        status_changes: {"знаменитый": true}
+        status_changes: {"известность": 2, "фехтование": true}   # получаете навык
   - text: "Украсть у неё книгу заклинаний"
-    requires: ["взломщик"]   # требуется навык взлома
+    requires: [{"взлом": "==true"}]
     outcomes:
-      - text: "Ведьма поймала вас и превратила в лягушку (временно)."
+      - text: "Ведьма поймала вас и превратила в лягушку."
         success_level: fail
-        status_changes: {}
-      - text: "Вы украли книгу, но она оказалась на непонятном языке."
+        status_changes: {"взлом": false}   # потеря навыка
+      - text: "Вы украли книгу, но она на непонятном языке."
         success_level: neutral
-        status_changes: {}
-      - text: "В книге вы нашли карту сокровищ и отправились на поиски – богатство гарантировано!"
+        status_changes: {"мудрость": 1}
+      - text: "В книге вы нашли карту сокровищ!"
         success_level: success
-        goal_achieved: wealth
-        status_changes: {"богатый": true}
+        status_changes: {"богатство": 3, "взлом": true}   # подтверждение навыка
   - text: "Вызвать её на состязание в мудрости"
-    requires: ["мудрый"]   # требуется мудрость
+    requires: [{"мудрость": ">=4"}]
     outcomes:
       - text: "Ведьма задала неразрешимую загадку, вы проиграли."
         success_level: fail
-        status_changes: {"мудрый": false}  # потеря мудрости
-      - text: "Вы ответили правильно, но ведьма ушла, не сказав ничего."
+        status_changes: {"мудрость": -1}
+      - text: "Вы ответили правильно, но ведьма ушла."
         success_level: neutral
-        status_changes: {}
-      - text: "Вы превзошли ведьму в мудрости, и она открыла вам тайный вход в подземный мир – ждите приключений!"
+        status_changes: {"мудрость": 1}
+      - text: "Вы превзошли ведьму, она открыла вам тайный вход."
         success_level: success
-        goal_achieved: adventure
-        status_changes: {"мудрый": true, "знаменитый": true}
+        status_changes: {"мудрость": 2, "известность": 1, "взлом": true}  # получаете навык

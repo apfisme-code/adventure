@@ -2,7 +2,15 @@ import random
 import os
 import glob
 import yaml
-from typing import List, Optional, Dict, Any, Tuple, Set
+import re
+from typing import List, Optional, Dict, Any, Tuple, Set, Union
+
+# ------------------- Загрузка конфигурации статусов -------------------
+
+def load_statuses_config(filepath: str = "statuses.yaml") -> Dict[str, Dict]:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f)
+    return data.get("statuses", {})
 
 # ------------------- Модели данных -------------------
 
@@ -20,17 +28,67 @@ class City:
         return self.name
 
 
+class Condition:
+    """Условие на статус: имя, оператор, значение (число или bool)."""
+    def __init__(self, status: str, operator: str, value: Union[int, bool]):
+        self.status = status
+        self.operator = operator
+        self.value = value
+
+    def check(self, player_statuses: Dict[str, Union[int, bool]]) -> bool:
+        current = player_statuses.get(self.status)
+        if current is None:
+            return False
+        if self.operator == "==":
+            return current == self.value
+        elif self.operator == "!=":
+            return current != self.value
+        elif self.operator == ">=":
+            return current >= self.value
+        elif self.operator == "<=":
+            return current <= self.value
+        elif self.operator == ">":
+            return current > self.value
+        elif self.operator == "<":
+            return current < self.value
+        else:
+            return False
+
+    @staticmethod
+    def parse(condition_dict: Dict[str, str]) -> 'Condition':
+        """Из словаря {status: ">=5"} или {status: "==true"} создаёт Condition."""
+        for status, expr in condition_dict.items():
+            # Поддерживаем: >=, <=, ==, !=, >, <
+            # Для булевых: ==true, ==false, !=true, !=false
+            op_match = re.match(r'([><=!]+)(.+)', expr)
+            if op_match:
+                operator, raw_value = op_match.groups()
+                # Преобразуем значение
+                if raw_value.lower() == 'true':
+                    value = True
+                elif raw_value.lower() == 'false':
+                    value = False
+                else:
+                    try:
+                        value = int(raw_value)
+                    except ValueError:
+                        raise ValueError(f"Некорректное значение условия: {expr}")
+                return Condition(status, operator, value)
+        raise ValueError(f"Некорректное условие: {condition_dict}")
+
+    def __repr__(self):
+        return f"{self.status} {self.operator} {self.value}"
+
+
 class Outcome:
-    def __init__(self, text: str, success_level: str, goal_achieved: Optional[str] = None,
-                 status_changes: Optional[Dict[str, bool]] = None):
+    def __init__(self, text: str, success_level: str, status_changes: Optional[Dict[str, Union[int, bool]]] = None):
         self.text = text
         self.success_level = success_level
-        self.goal_achieved = goal_achieved
         self.status_changes = status_changes or {}
 
 
 class Choice:
-    def __init__(self, text: str, outcomes: List[Outcome], requires: Optional[List[str]] = None):
+    def __init__(self, text: str, outcomes: List[Outcome], requires: Optional[List[Condition]] = None):
         self.text = text
         self.outcomes = outcomes
         self.requires = requires or []
@@ -41,7 +99,7 @@ class Choice:
 
 class Event:
     def __init__(self, text: str, choices: List[Choice], tags: List[str],
-                 is_goal_event: bool = False, requires: Optional[List[str]] = None):
+                 is_goal_event: bool = False, requires: Optional[List[Condition]] = None):
         self.text = text
         self.choices = choices
         self.tags = tags
@@ -82,24 +140,29 @@ class EventLoader:
             text = data["text"]
             is_goal = data.get("is_goal_event", False)
             tags = data.get("tags", [])
-            requires = data.get("requires", [])
+            requires = self._parse_conditions(data.get("requires", []))
             choices_data = data.get("choices", [])
             choices = []
             for choice_item in choices_data:
                 choice_text = choice_item["text"]
-                choice_requires = choice_item.get("requires", [])
+                choice_requires = self._parse_conditions(choice_item.get("requires", []))
                 outcomes_data = choice_item.get("outcomes", [])
                 outcomes = []
                 for out in outcomes_data:
                     level = out["success_level"]
-                    goal = out.get("goal_achieved")
                     changes = out.get("status_changes", {})
-                    outcomes.append(Outcome(out["text"], level, goal, changes))
+                    outcomes.append(Outcome(out["text"], level, changes))
                 choices.append(Choice(choice_text, outcomes, choice_requires))
             return Event(text, choices, tags, is_goal, requires)
         except KeyError as e:
             print(f"Ошибка в данных события: отсутствует поле {e}")
             return None
+
+    def _parse_conditions(self, raw_conditions: List[Dict[str, str]]) -> List[Condition]:
+        conditions = []
+        for cond_dict in raw_conditions:
+            conditions.append(Condition.parse(cond_dict))
+        return conditions
 
     def get_events_by_tag(self, tag: str) -> List[Event]:
         return self._tag_cache.get(tag, [])
@@ -108,11 +171,17 @@ class EventLoader:
 # ------------------- Игровой движок -------------------
 
 class Player:
-    def __init__(self, start_city: City, goal: str):
+    def __init__(self, start_city: City, goal: Condition, statuses_config: Dict[str, Dict]):
         self.current_city = start_city
         self.goal = goal
-        self.progress = 0
-        self.statuses: Set[str] = set()
+        self.statuses_config = statuses_config
+        # Инициализация статусов по умолчанию
+        self.statuses = {}
+        for name, info in statuses_config.items():
+            if info["type"] == "numeric":
+                self.statuses[name] = info.get("default", 0)
+            elif info["type"] == "boolean":
+                self.statuses[name] = info.get("default", False)
         self.history: List[Dict] = []
         self.game_over = False
 
@@ -121,43 +190,55 @@ class Player:
         self.history.append({"action": "move", "to": city.name})
 
     def add_event_record(self, event_type: str, event: Event, choice: Choice,
-                         outcome: Outcome, progress_gained: int = 0,
-                         status_changes: Optional[Dict[str, bool]] = None):
+                         outcome: Outcome, status_changes: Optional[Dict[str, Union[int, bool]]] = None):
         self.history.append({
             "type": event_type,
             "event": event.text,
             "choice": choice.text,
             "outcome": outcome.text,
             "success_level": outcome.success_level,
-            "goal_achieved": outcome.goal_achieved,
-            "progress_gained": progress_gained,
             "status_changes": status_changes or {}
         })
 
-    def add_progress(self, amount: int = 1):
-        self.progress = min(100, self.progress + amount)
-        if self.progress >= 100:
-            self.game_over = True
+    def apply_status_changes(self, changes: Dict[str, Union[int, bool]]):
+        """Изменяет значения статусов согласно типу."""
+        for status, value in changes.items():
+            if status not in self.statuses_config:
+                continue
+            info = self.statuses_config[status]
+            if info["type"] == "numeric":
+                # value должно быть числом (прибавляем/отнимаем)
+                if not isinstance(value, int):
+                    continue
+                current = self.statuses.get(status, 0)
+                new_value = current + value
+                min_val = info.get("min", 0)
+                max_val = info.get("max", 10)
+                if new_value < min_val:
+                    new_value = min_val
+                if new_value > max_val:
+                    new_value = max_val
+                self.statuses[status] = new_value
+            elif info["type"] == "boolean":
+                # value должно быть bool (устанавливаем)
+                if not isinstance(value, bool):
+                    continue
+                self.statuses[status] = value
 
-    def apply_status_changes(self, changes: Dict[str, bool]):
-        for status, add in changes.items():
-            if add:
-                self.statuses.add(status)
-            else:
-                self.statuses.discard(status)
+    def has_conditions(self, conditions: List[Condition]) -> bool:
+        return all(cond.check(self.statuses) for cond in conditions)
 
-    def has_statuses(self, required: List[str]) -> bool:
-        return all(s in self.statuses for s in required)
+    def check_goal(self) -> bool:
+        return self.goal.check(self.statuses)
 
 
 class Game:
-    def __init__(self, loader: EventLoader):
+    def __init__(self, loader: EventLoader, statuses_config: Dict[str, Dict]):
         self.loader = loader
+        self.statuses_config = statuses_config
         self.cities, self.edge_tags = self._build_map()
         self.player = None
         self.current_edge_tag = None
-        self.goals = ['wealth', 'fame', 'adventure']
-        self.goal_names = {'wealth': 'Богатство', 'fame': 'Известность', 'adventure': 'Приключения'}
 
     def _build_map(self) -> Tuple[Dict[str, City], Dict[Tuple[str, str], str]]:
         city_tags = ['деревня', 'деревня', 'деревня', 'небольшой город', 'небольшой город', 'столица', 'столица']
@@ -188,30 +269,42 @@ class Game:
         return self.edge_tags.get(key)
 
     def get_available_events(self, events: List[Event]) -> List[Event]:
-        return [ev for ev in events if self.player.has_statuses(ev.requires)]
+        return [ev for ev in events if self.player.has_conditions(ev.requires)]
 
     def get_available_choices(self, choices: List[Choice]) -> List[Choice]:
-        return [ch for ch in choices if self.player.has_statuses(ch.requires)]
+        return [ch for ch in choices if self.player.has_conditions(ch.requires)]
 
     def print_statuses(self, prefix: str = "Текущие статусы"):
-        """Выводит текущие статусы игрока."""
         if self.player.statuses:
-            print(f"{prefix}: {', '.join(sorted(self.player.statuses))}")
+            parts = []
+            for name, value in sorted(self.player.statuses.items()):
+                if isinstance(value, bool):
+                    parts.append(f"{name}: {'да' if value else 'нет'}")
+                else:
+                    parts.append(f"{name}: {value}")
+            print(f"{prefix}: {', '.join(parts)}")
         else:
             print(f"{prefix}: нет")
 
     def start(self):
+        # Генерация цели: может быть числовой или булевой
+        possible_goals = [
+            Condition("известность", ">=", 3),
+            Condition("богатство", ">=", 5),
+            Condition("мудрость", ">=", 4),
+            Condition("фехтование", "==", True),   # стать фехтовальщиком
+            Condition("взлом", "==", True),        # стать взломщиком
+        ]
+        goal = random.choice(possible_goals)
+
         start_city = random.choice(list(self.cities.values()))
-        goal = random.choice(self.goals)
-        self.player = Player(start_city, goal)
-        self.player.statuses.add("красноречивый")  # начальный бонус
+        self.player = Player(start_city, goal, self.statuses_config)
         self.current_edge_tag = None
 
         print(f"Добро пожаловать в игру-путешествие по сказочному миру!")
         print(f"Вы начинаете в городе {start_city.name} (тип: {start_city.tag}).")
-        print(f"Ваша цель: {self.goal_names[goal]}.")
-        print("Вы должны набрать 100 очков прогресса, совершая успешные действия в рамках вашей цели.")
-        print("Каждый успех прибавляет 1 очко. Путешествуйте и создавайте свою историю!\n")
+        print(f"Ваша цель: {goal.status} {goal.operator} {goal.value}.")
+        print("Путешествуйте, делайте выборы, развивайте свои навыки и достигните цели!\n")
 
         self.city_events = self.loader.get_events_by_tag("city")
         self.travel_events = self.loader.get_events_by_tag("travel")
@@ -239,11 +332,10 @@ class Game:
                 self.player.game_over = True
 
         print("\n=== Игра завершена ===")
-        if self.player.progress >= 100:
-            print("Поздравляем! Вы достигли 100 очков прогресса и выполнили свою цель!")
+        if self.player.check_goal():
+            print(f"Поздравляем! Вы достигли цели: {self.player.goal.status} {self.player.goal.operator} {self.player.goal.value}!")
         else:
-            print("Игра прервана. Вы не достигли цели.")
-        print(f"Итоговый прогресс: {self.player.progress}/100")
+            print("Вы не достигли цели.")
         self.print_statuses("Финальные статусы")
         print("Ваш путь:")
         for record in self.player.history:
@@ -252,21 +344,18 @@ class Game:
             else:
                 print(f"  {record['type']}: {record['event']}")
                 print(f"    Выбор: {record['choice']} -> {record['outcome']} ({record['success_level']})")
-                if record.get("progress_gained", 0) > 0:
-                    print(f"    Прогресс +{record['progress_gained']}")
                 if record.get("status_changes"):
                     changes = record["status_changes"]
-                    added = [s for s, v in changes.items() if v]
-                    removed = [s for s, v in changes.items() if not v]
-                    if added:
-                        print(f"    Получены статусы: {', '.join(added)}")
-                    if removed:
-                        print(f"    Потеряны статусы: {', '.join(removed)}")
-        print(f"Цель: {self.goal_names[self.player.goal]} достигнута на {self.player.progress}%.")
+                    for stat, delta in changes.items():
+                        if isinstance(delta, bool):
+                            print(f"    {stat}: {'установлен' if delta else 'сброшен'}")
+                        else:
+                            print(f"    {stat}: {delta:+d}")
+        print(f"Цель: {self.player.goal.status} {self.player.goal.operator} {self.player.goal.value} | " +
+              f"Текущее: {self.player.statuses.get(self.player.goal.status)}")
 
     def show_status(self):
         print(f"\n--- Текущий город: {self.player.current_city.name} (тип: {self.player.current_city.tag}) ---")
-        print(f"Прогресс к цели: {self.player.progress}/100")
         self.print_statuses()
         neighbors = self.player.current_city.neighbors
         print("Доступные направления:")
@@ -322,7 +411,7 @@ class Game:
             return
 
         for i, choice in enumerate(available_choices):
-            req_str = f" (требуется: {', '.join(choice.requires)})" if choice.requires else ""
+            req_str = f" (требуется: {', '.join(str(c) for c in choice.requires)})" if choice.requires else ""
             print(f"  {i+1}. {choice.text}{req_str}")
 
         while True:
@@ -341,38 +430,30 @@ class Game:
 
         # Применяем изменения статусов и выводим их
         if outcome.status_changes:
-            # Запоминаем старые статусы для вывода изменений
-            old_statuses = set(self.player.statuses)
+            old_values = {s: self.player.statuses.get(s) for s in outcome.status_changes.keys()}
             self.player.apply_status_changes(outcome.status_changes)
-            new_statuses = self.player.statuses
-
-            added = new_statuses - old_statuses
-            removed = old_statuses - new_statuses
-            if added:
-                print(f"Получены статусы: {', '.join(sorted(added))}")
-            if removed:
-                print(f"Потеряны статусы: {', '.join(sorted(removed))}")
+            for status, delta in outcome.status_changes.items():
+                new_val = self.player.statuses.get(status)
+                old_val = old_values.get(status)
+                if isinstance(delta, bool):
+                    print(f"{status}: {'да' if new_val else 'нет'} (было: {'да' if old_val else 'нет'})")
+                else:
+                    print(f"{status}: {old_val} → {new_val} ({delta:+d})")
             self.print_statuses("Обновлённые статусы")
         else:
             self.print_statuses("Ваши статусы")
 
-        progress_gained = 0
-        if outcome.goal_achieved == self.player.goal:
-            self.player.add_progress(1)
-            progress_gained = 1
-            print(f"Прогресс +1! (текущий: {self.player.progress}/100)")
+        self.player.add_event_record(event_type, event, chosen_choice, outcome, outcome.status_changes)
 
-        self.player.add_event_record(event_type, event, chosen_choice, outcome,
-                                     progress_gained, outcome.status_changes)
-
-        if self.player.progress >= 100:
-            print("Поздравляем! Вы достигли 100 очков прогресса и выполнили свою цель!")
+        if self.player.check_goal():
+            print(f"Поздравляем! Вы достигли цели: {self.player.goal.status} {self.player.goal.operator} {self.player.goal.value}!")
             self.player.game_over = True
 
 
 # ------------------- Запуск -------------------
 
 if __name__ == "__main__":
+    statuses_config = load_statuses_config("statuses.yaml")
     loader = EventLoader("events")
-    game = Game(loader)
+    game = Game(loader, statuses_config)
     game.start()
