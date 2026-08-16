@@ -1,0 +1,20 @@
+text: "В глубине леса вы находите отшельника, который знает, как снять проклятие."
+is_goal_event: false
+tags:
+  - travel
+  - лес
+requires: [{"проклят": "==true"}]   # событие доступно только проклятым
+choices:
+  - text: "Попросить отшельника снять проклятие"
+    requires: []
+    outcomes:
+      - text: "Отшельник совершает обряд, и тёмная энергия покидает вас."
+        success_level: success
+        status_changes: {"проклят": false}
+        add_quest: null   # не добавляем квест
+  - text: "Отказаться и уйти"
+    requires: []
+    outcomes:
+      - text: "Вы уходите, проклятие остаётся."
+        success_level: neutral
+        status_changes: {}

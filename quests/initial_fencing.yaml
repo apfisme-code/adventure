@@ -1,0 +1,4 @@
+id: initial_fencing
+name: "Стать фехтовальщиком"
+description: "Овладейте искусством фехтования."
+condition: {"фехтование": "==true"}

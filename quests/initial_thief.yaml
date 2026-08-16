@@ -1,0 +1,4 @@
+id: initial_thief
+name: "Стать взломщиком"
+description: "Научитесь открывать любые замки."
+condition: {"взлом": "==true"}
