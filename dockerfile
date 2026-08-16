@@ -8,5 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY game.py .
 COPY statuses.yaml .
 COPY events/ events/
+COPY quests/ quests/
 
 CMD ["python", "-u", "game.py"]

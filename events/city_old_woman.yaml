@@ -4,14 +4,18 @@ tags:
   - city
 choices:
   - text: "Выслушать её"
+    requires: []
     outcomes:
       - text: "Она оказалась сумасшедшей, вы потеряли время."
         success_level: fail
+        status_changes: {}
       - text: "Она рассказала легенду, которая позже пригодилась."
         success_level: neutral
-      - text: "Она открыла вам путь к великому приключению!"
+        status_changes: {"мудрость": 1}
+      - text: "Она открыла вам путь к великому приключению, но прокляла вас за беспокойство."
         success_level: success
-        goal_achieved: adventure
+        status_changes: {"проклят": true, "мудрость": 1}
+        quest_add: "cursed"   # добавляем квест
   - text: "Дать ей монету"
     outcomes:
       - text: "Она взяла монету и исчезла, ничего не сказав."
