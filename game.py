@@ -98,14 +98,12 @@ class Outcome:
                  status_changes: Optional[Dict[str, Union[int, bool]]] = None,
                  add_quest: Optional[str] = None,
                  complete_quest: bool = False,
-                 fail_quest: bool = False,
                  next_event: Optional[str] = None):
         self.text = text
         self.success_level = success_level
         self.status_changes = status_changes or {}
         self.add_quest = add_quest
         self.complete_quest = complete_quest
-        self.fail_quest = fail_quest
         self.next_event = next_event  # может быть id события или "tag:тег"
 
 
@@ -203,9 +201,8 @@ class EventLoader:
                     changes = out.get("status_changes", {})
                     add_quest = out.get("add_quest")
                     complete_quest = out.get("complete_quest", False)
-                    fail_quest = out.get("fail_quest", False)
                     next_event = out.get("next_event")  # строка или None
-                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, fail_quest, next_event))
+                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, next_event))
                 choices.append(Choice(choice_text, outcomes, choice_requires))
             return Event(event_id, text, choices, tags, is_goal, requires)
         except KeyError as e:
@@ -314,9 +311,10 @@ class Player:
             return self.quest_stack[-1]
         return None
 
-    def complete_quest(self, quest: Quest) -> bool:
+    def complete_current_quest(self) -> bool:
         """Пытается завершить квест (проверяет условия). Возвращает True, если завершён."""
-        if not quest.check_completion(self.statuses):
+        quest = self.get_current_quest()
+        if quest is None or not quest.check_completion(self.statuses):
             return False
         # Завершаем квест
         # Применяем on_complete
@@ -330,13 +328,6 @@ class Player:
         # Удаляем текущий из стека
         self.quest_stack.remove(quest)
         return True
-
-    def fail_quest(self, quest: Quest):
-        """Проваливает квест: применяет on_fail, удаляет квест."""
-        if "status_changes" in quest.on_fail:
-            self.apply_status_changes(quest.on_fail["status_changes"])
-        # Удаляем
-        self.quest_stack.remove(quest)
 
     def check_win_condition(self) -> bool:
         """Победа, если стек квестов пуст."""
@@ -491,10 +482,6 @@ class Game:
                             print(f"    {stat}: {'установлен' if delta else 'сброшен'}")
                         else:
                             print(f"    {stat}: {delta:+d}")
-                if record.get("quest_changes"):
-                    print(f"    Квесты: {', '.join(record['quest_changes'])}")
-        print(f"Цель: {self.player.goal.status} {self.player.goal.operator} {self.player.goal.value} | " +
-              f"Текущее: {self.player.statuses.get(self.player.goal.status)}")
 
     def show_status(self):
         print(f"\n--- Текущий город: {self.player.current_city.name} (тип: {self.player.current_city.tag}) ---")
@@ -591,30 +578,23 @@ class Game:
             self.print_statuses("Ваши статусы")
 
         # Обработка квестов
-        quest_changes = []
-        current_quest = self.player.get_current_quest()
-        if outcome.complete_quest and current_quest:
-            if self.player.complete_quest(current_quest):
-                quest_changes.append(f"Квест '{current_quest.name}' завершён!")
+        if outcome.complete_quest:
+            if self.player.complete_current_quest():
                 if self.player.check_win_condition():
                     print("Поздравляем! Вы выполнили все квесты! Победа!")
                     self.player.game_over = True
-                    self.player.add_event_record(event_type, event, chosen_choice, outcome, status_changes, quest_changes)
+                    self.player.add_event_record(event_type, event, chosen_choice, outcome)
                     return
             else:
-                print(f"Условия квеста '{current_quest.name}' не выполнены.")
-
-        if outcome.fail_quest and current_quest:
-            self.player.fail_quest(current_quest)
-            quest_changes.append(f"Квест '{current_quest.name}' провален!")
-            print(f"Квест '{current_quest.name}' провален.")
+                quest = self.player.get_current_quest()
+                if quest is not None:
+                    print(f"Условия квеста '{quest.name}' не выполнены.")
 
         if outcome.add_quest:
             quest_id = outcome.add_quest
             if quest_id in self.quests_db:
                 new_quest = Quest.from_data(self.quests_db[quest_id])
                 self.player.quest_stack.append(new_quest)
-                quest_changes.append(f"Добавлен квест: {new_quest.name}")
                 print(f"Новый квест: {new_quest.name} - {new_quest.description}")
 
         self.player.add_event_record(event_type, event, chosen_choice, outcome, outcome.status_changes)
