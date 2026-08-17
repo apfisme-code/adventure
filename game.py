@@ -614,25 +614,30 @@ class Game:
             # Определяем следующее событие
             next_event_ref = outcome.next_event
             if next_event_ref:
+                next_event = None
                 if next_event_ref.startswith("tag:"):
                     tag = next_event_ref[4:]
-                    next_event = self.loader.get_random_event_by_tag(tag)
-                    if not next_event:
-                        print(f"Нет событий с тегом '{tag}'. Цепочка прервана.")
-                        event = None
+                    # Получаем все события с тегом и фильтруем по условиям
+                    candidates = self.loader.get_events_by_tag(tag)
+                    available = [ev for ev in candidates if self.player.has_conditions(ev.requires)]
+                    if not available:
+                        print(f"Нет доступных событий с тегом '{tag}' для ваших статусов. Цепочка прервана.")
                     else:
+                        next_event = random.choice(available)
                         print(f"\n--- Переход к случайному событию с тегом '{tag}' ---")
-                        event = next_event
-                        event_type = "chain"
                 else:
                     next_event = self.loader.get_event_by_id(next_event_ref)
                     if not next_event:
                         print(f"Событие с id '{next_event_ref}' не найдено. Цепочка прервана.")
-                        event = None
                     else:
-                        print(f"\n--- Переход к событию '{next_event.id}' ---")
-                        event = next_event
-                        event_type = "chain"
+                        if not self.player.has_conditions(next_event.requires):
+                            print(f"Событие '{next_event.id}' недоступно: не выполнены условия.")
+                            next_event = None
+                        else:
+                            print(f"\n--- Переход к событию '{next_event.id}' ---")
+                event = next_event  # может быть None
+                if event is not None:
+                    event_type = "chain"
             else:
                 event = None
 
