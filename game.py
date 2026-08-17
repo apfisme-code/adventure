@@ -285,12 +285,8 @@ class Player:
         self.current_city = None  # будет установлен позже
         self.history: List[Dict] = []
         self.game_over = False
-        self.in_event_chain = False  # флаг, что мы внутри цепочки событий (нельзя перемещаться)
 
     def move_to(self, city: City):
-        if self.in_event_chain:
-            print("Вы не можете перемещаться, пока не завершите цепочку событий!")
-            return False
         self.current_city = city
         self.history.append({"action": "move", "to": city.name})
         return True
@@ -460,30 +456,23 @@ class Game:
             print("ВНИМАНИЕ: Не найдено событий в пути (тег 'travel').")
 
         while not self.player.game_over:
-            if not self.player.in_event_chain:
-                self.show_status()
-                self.handle_move()
+            self.show_status()
+            self.handle_move()
+            if self.player.game_over:
+                break
+            # Событие в пути с вероятностью 30%
+            if random.random() < 0.3 and self.travel_events:
+                self.handle_travel_event()
                 if self.player.game_over:
                     break
-                # Событие в пути с вероятностью 30%
-                if random.random() < 0.3 and self.travel_events:
-                    self.handle_travel_event()
-                    if self.player.game_over:
-                        break
-                # Городское событие
-                if self.city_events:
-                    self.handle_city_event()
-                    if self.player.game_over:
-                        break
-                else:
-                    print("Нет доступных городских событий. Игра завершена.")
-                    self.player.game_over = True
+            # Городское событие
+            if self.city_events:
+                self.handle_city_event()
+                if self.player.game_over:
+                    break
             else:
-                # Если мы в цепочке, не даём перемещаться, только обрабатываем следующее событие
-                # (у нас уже есть next_event, которое мы обработаем в process_event)
-                # Но мы должны ждать, пока цепочка не закончится.
-                # В process_event мы будем вызывать следующий, и он установит флаг обратно.
-                pass
+                print("Нет доступных городских событий. Игра завершена.")
+                self.player.game_over = True
 
         print("\n=== Игра завершена ===")
         if self.player.check_win_condition():
@@ -558,94 +547,94 @@ class Game:
         print(f"\n[Город {self.player.current_city.name} ({self.player.current_city.tag})] {event.text}")
         self.process_event(event, "city")
 
-def process_event(self, event: Event, event_type: str):
-    while event is not None:
-        print(f"\n[{event_type}] {event.text}")
+    def process_event(self, event: Event, event_type: str):
+        while event is not None:
+            print(f"\n[{event_type}] {event.text}")
 
-        available_choices = self.get_available_choices(event.choices)
-        if not available_choices:
-            print("Нет доступных вариантов для ваших статусов. Цепочка прервана.")
-            break
+            available_choices = self.get_available_choices(event.choices)
+            if not available_choices:
+                print("Нет доступных вариантов для ваших статусов. Цепочка прервана.")
+                break
 
-        for i, choice in enumerate(available_choices):
-            req_str = f" (требуется: {', '.join(str(c) for c in choice.requires)})" if choice.requires else ""
-            print(f"  {i+1}. {choice.text}{req_str}")
+            for i, choice in enumerate(available_choices):
+                req_str = f" (требуется: {', '.join(str(c) for c in choice.requires)})" if choice.requires else ""
+                print(f"  {i+1}. {choice.text}{req_str}")
 
-        while True:
-            try:
-                idx = int(input("Ваш выбор (номер): ")) - 1
-                if 0 <= idx < len(available_choices):
-                    chosen_choice = available_choices[idx]
-                    break
-                else:
-                    print("Неверный номер.")
-            except ValueError:
-                print("Введите число.")
+            while True:
+                try:
+                    idx = int(input("Ваш выбор (номер): ")) - 1
+                    if 0 <= idx < len(available_choices):
+                        chosen_choice = available_choices[idx]
+                        break
+                    else:
+                        print("Неверный номер.")
+                except ValueError:
+                    print("Введите число.")
 
-        outcome = chosen_choice.resolve()
-        print(f"Результат: {outcome.text}")
+            outcome = chosen_choice.resolve()
+            print(f"Результат: {outcome.text}")
 
-        # Применяем изменения статусов
-        if outcome.status_changes:
-            old_values = {s: self.player.statuses.get(s) for s in outcome.status_changes.keys()}
-            self.player.apply_status_changes(outcome.status_changes)
-            for status, delta in outcome.status_changes.items():
-                new_val = self.player.statuses.get(status)
-                old_val = old_values.get(status)
-                if isinstance(delta, bool):
-                    print(f"{status}: {'да' if new_val else 'нет'} (было: {'да' if old_val else 'нет'})")
-                else:
-                    print(f"{status}: {old_val} → {new_val} ({delta:+d})")
-            self.print_statuses("Обновлённые статусы")
-        else:
-            self.print_statuses("Ваши статусы")
-
-        # Обработка квестов
-        if outcome.complete_quest:
-            if self.player.complete_current_quest():
-                if self.player.check_win_condition():
-                    print("Поздравляем! Вы выполнили все квесты! Победа!")
-                    self.player.game_over = True
-                    self.player.add_event_record(event_type, event, chosen_choice, outcome)
-                    return
+            # Применяем изменения статусов
+            if outcome.status_changes:
+                old_values = {s: self.player.statuses.get(s) for s in outcome.status_changes.keys()}
+                self.player.apply_status_changes(outcome.status_changes)
+                for status, delta in outcome.status_changes.items():
+                    new_val = self.player.statuses.get(status)
+                    old_val = old_values.get(status)
+                    if isinstance(delta, bool):
+                        print(f"{status}: {'да' if new_val else 'нет'} (было: {'да' if old_val else 'нет'})")
+                    else:
+                        print(f"{status}: {old_val} → {new_val} ({delta:+d})")
+                self.print_statuses("Обновлённые статусы")
             else:
-                quest = self.player.get_current_quest()
-                if quest is not None:
-                    print(f"Условия квеста '{quest.name}' не выполнены.")
+                self.print_statuses("Ваши статусы")
 
-        if outcome.add_quest:
-            quest_id = outcome.add_quest
-            if quest_id in self.quests_db:
-                new_quest = Quest.from_data(self.quests_db[quest_id], self.statuses_config)
-                self.player.quest_stack.append(new_quest)
-                print(f"Новый квест: {new_quest.name} - {new_quest.description}")
-
-        self.player.add_event_record(event_type, event, chosen_choice, outcome, outcome.status_changes)
-
-        # Определяем следующее событие
-        next_event_ref = outcome.next_event
-        if next_event_ref:
-            if next_event_ref.startswith("tag:"):
-                tag = next_event_ref[4:]
-                next_event = self.loader.get_random_event_by_tag(tag)
-                if not next_event:
-                    print(f"Нет событий с тегом '{tag}'. Цепочка прервана.")
-                    event = None
+            # Обработка квестов
+            if outcome.complete_quest:
+                if self.player.complete_current_quest():
+                    if self.player.check_win_condition():
+                        print("Поздравляем! Вы выполнили все квесты! Победа!")
+                        self.player.game_over = True
+                        self.player.add_event_record(event_type, event, chosen_choice, outcome)
+                        return
                 else:
-                    print(f"\n--- Переход к случайному событию с тегом '{tag}' ---")
-                    event = next_event
-                    event_type = "chain"
+                    quest = self.player.get_current_quest()
+                    if quest is not None:
+                        print(f"Условия квеста '{quest.name}' не выполнены.")
+
+            if outcome.add_quest:
+                quest_id = outcome.add_quest
+                if quest_id in self.quests_db:
+                    new_quest = Quest.from_data(self.quests_db[quest_id], self.statuses_config)
+                    self.player.quest_stack.append(new_quest)
+                    print(f"Новый квест: {new_quest.name} - {new_quest.description}")
+
+            self.player.add_event_record(event_type, event, chosen_choice, outcome, outcome.status_changes)
+
+            # Определяем следующее событие
+            next_event_ref = outcome.next_event
+            if next_event_ref:
+                if next_event_ref.startswith("tag:"):
+                    tag = next_event_ref[4:]
+                    next_event = self.loader.get_random_event_by_tag(tag)
+                    if not next_event:
+                        print(f"Нет событий с тегом '{tag}'. Цепочка прервана.")
+                        event = None
+                    else:
+                        print(f"\n--- Переход к случайному событию с тегом '{tag}' ---")
+                        event = next_event
+                        event_type = "chain"
+                else:
+                    next_event = self.loader.get_event_by_id(next_event_ref)
+                    if not next_event:
+                        print(f"Событие с id '{next_event_ref}' не найдено. Цепочка прервана.")
+                        event = None
+                    else:
+                        print(f"\n--- Переход к событию '{next_event.id}' ---")
+                        event = next_event
+                        event_type = "chain"
             else:
-                next_event = self.loader.get_event_by_id(next_event_ref)
-                if not next_event:
-                    print(f"Событие с id '{next_event_ref}' не найдено. Цепочка прервана.")
-                    event = None
-                else:
-                    print(f"\n--- Переход к событию '{next_event.id}' ---")
-                    event = next_event
-                    event_type = "chain"
-        else:
-            event = None
+                event = None
 
 
 # ------------------- Запуск -------------------
