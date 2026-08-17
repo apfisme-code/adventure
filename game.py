@@ -558,15 +558,14 @@ class Game:
         print(f"\n[Город {self.player.current_city.name} ({self.player.current_city.tag})] {event.text}")
         self.process_event(event, "city")
 
-    def process_event(self, event: Event, event_type: str):
-        # Устанавливаем флаг цепочки (если событие имеет next_event, он останется)
-        self.player.in_event_chain = True
+def process_event(self, event: Event, event_type: str):
+    while event is not None:
+        print(f"\n[{event_type}] {event.text}")
 
         available_choices = self.get_available_choices(event.choices)
         if not available_choices:
-            print("Нет доступных вариантов для ваших статусов. Событие пропущено.")
-            self.player.in_event_chain = False
-            return
+            print("Нет доступных вариантов для ваших статусов. Цепочка прервана.")
+            break
 
         for i, choice in enumerate(available_choices):
             req_str = f" (требуется: {', '.join(str(c) for c in choice.requires)})" if choice.requires else ""
@@ -623,30 +622,30 @@ class Game:
 
         self.player.add_event_record(event_type, event, chosen_choice, outcome, outcome.status_changes)
 
-
-        # Обработка перехода к следующему событию
-        if outcome.next_event:
-            next_event_ref = outcome.next_event
+        # Определяем следующее событие
+        next_event_ref = outcome.next_event
+        if next_event_ref:
             if next_event_ref.startswith("tag:"):
                 tag = next_event_ref[4:]
                 next_event = self.loader.get_random_event_by_tag(tag)
                 if not next_event:
                     print(f"Нет событий с тегом '{tag}'. Цепочка прервана.")
-                    self.player.in_event_chain = False
-                    return
-                print(f"\n--- Переход к случайному событию с тегом '{tag}' ---")
-                self.process_event(next_event, "chain")
+                    event = None
+                else:
+                    print(f"\n--- Переход к случайному событию с тегом '{tag}' ---")
+                    event = next_event
+                    event_type = "chain"
             else:
                 next_event = self.loader.get_event_by_id(next_event_ref)
                 if not next_event:
                     print(f"Событие с id '{next_event_ref}' не найдено. Цепочка прервана.")
-                    self.player.in_event_chain = False
-                    return
-                print(f"\n--- Переход к событию '{next_event.id}' ---")
-                self.process_event(next_event, "chain")
+                    event = None
+                else:
+                    print(f"\n--- Переход к событию '{next_event.id}' ---")
+                    event = next_event
+                    event_type = "chain"
         else:
-            # Цепочка завершена
-            self.player.in_event_chain = False
+            event = None
 
 
 # ------------------- Запуск -------------------
