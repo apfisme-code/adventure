@@ -76,16 +76,40 @@ class Condition:
             return False
 
     @staticmethod
-    def parse(condition_dict: Dict[str, str]) -> 'Condition':
-        status = condition_dict.get('status', None)
-        operator = condition_dict.get('operator', None)
-        value = condition_dict.get('value', None)
-
-        if status is None or operator is None or value is None:
+    def parse(condition_dict: Dict[str, str], statuses_config: Dict[str, Dict]) -> 'Condition':
+        status = condition_dict.get('status')
+        operator = condition_dict.get('operator')
+        value = condition_dict.get('value')
+        if None in (status, operator, value):
             raise ValueError(f"Некорректное условие: {condition_dict}")
+        if operator not in (">=", "<=", "==", "!=", ">", "<"):
+            raise ValueError(f"Недопустимый оператор: {operator}")
 
-        if not re.match(r'([><=!]+)(.+)', operator):
-            raise ValueError(f"Некорректный оператор: {operator} в условии: {condition_dict}")
+        # Приведение value к типу статуса
+        status_info = statuses_config.get(status)
+        if status_info is None:
+            raise ValueError(f"Неизвестный статус: {status}")
+
+        if status_info["type"] == "numeric":
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                raise ValueError(f"Для числового статуса '{status}' значение должно быть числом: {value}")
+        elif status_info["type"] == "boolean":
+            if isinstance(value, bool):
+                pass  # уже bool
+            elif isinstance(value, str):
+                lower = value.lower()
+                if lower == "true":
+                    value = True
+                elif lower == "false":
+                    value = False
+                else:
+                    raise ValueError(f"Для булевого статуса '{status}' значение должно быть true/false: {value}")
+            else:
+                raise ValueError(f"Для булевого статуса '{status}' значение должно быть true/false: {value}")
+        else:
+            raise ValueError(f"Неизвестный тип статуса: {status_info['type']}")
 
         return Condition(status, operator, value)
 
@@ -144,8 +168,8 @@ class Quest:
         self.on_fail = on_fail or {}
 
     @staticmethod
-    def from_data(data: Dict) -> 'Quest':
-        conditions = [Condition.parse(c) for c in data.get("conditions", [])]
+    def from_data(data: Dict, statuses_config: Dict) -> 'Quest':
+        conditions = [Condition.parse(c, statuses_config) for c in data.get("conditions", [])]
         on_complete = data.get("on_complete", {})
         on_fail = data.get("on_fail", {})
         return Quest(data["id"], data["name"], data["description"],
@@ -157,8 +181,9 @@ class Quest:
 # ------------------- Загрузчик событий из файлов -------------------
 
 class EventLoader:
-    def __init__(self, events_dir: str = "events"):
+    def __init__(self, events_dir: str = "events", statuses_config: Dict = None):    
         self.events_dir = events_dir
+        self.statuses_config = statuses_config or {}
         self._tag_cache: Dict[str, List[Event]] = {}
         self._id_cache: Dict[str, Event] = {}
         self._load_all()
@@ -212,7 +237,7 @@ class EventLoader:
     def _parse_conditions(self, raw_conditions: List[Dict[str, str]]) -> List[Condition]:
         conditions = []
         for cond_dict in raw_conditions:
-            conditions.append(Condition.parse(cond_dict))
+            conditions.append(Condition.parse(cond_dict, self.statuses_config))
         return conditions
 
     def get_events_by_tag(self, tag: str) -> List[Event]:
@@ -255,7 +280,7 @@ class Player:
         # Добавляем начальный квест
         start_quest_id = character_data["goal_quest"]
         if start_quest_id in self.quests_db:
-            self.quest_stack.append(Quest.from_data(self.quests_db[start_quest_id]))
+            self.quest_stack.append(Quest.from_data(self.quests_db[start_quest_id], statuses_config))
 
         self.current_city = None  # будет установлен позже
         self.history: List[Dict] = []
@@ -312,21 +337,20 @@ class Player:
         return None
 
     def complete_current_quest(self) -> bool:
-        """Пытается завершить квест (проверяет условия). Возвращает True, если завершён."""
         quest = self.get_current_quest()
         if quest is None or not quest.check_completion(self.statuses):
             return False
-        # Завершаем квест
         # Применяем on_complete
         if "status_changes" in quest.on_complete:
             self.apply_status_changes(quest.on_complete["status_changes"])
-        # Добавляем новый квест, если указан
+        # Запоминаем, нужно ли добавить новый
         next_quest_id = quest.on_complete.get("add_quest")
+        # Удаляем текущий (он последний)
+        self.quest_stack.pop()
+        # Добавляем новый
         if next_quest_id and next_quest_id in self.quests_db:
-            new_quest = Quest.from_data(self.quests_db[next_quest_id])
+            new_quest = Quest.from_data(self.quests_db[next_quest_id], self.statuses_config)
             self.quest_stack.append(new_quest)
-        # Удаляем текущий из стека
-        self.quest_stack.remove(quest)
         return True
 
     def check_win_condition(self) -> bool:
@@ -593,7 +617,7 @@ class Game:
         if outcome.add_quest:
             quest_id = outcome.add_quest
             if quest_id in self.quests_db:
-                new_quest = Quest.from_data(self.quests_db[quest_id])
+                new_quest = Quest.from_data(self.quests_db[quest_id], self.statuses_config)
                 self.player.quest_stack.append(new_quest)
                 print(f"Новый квест: {new_quest.name} - {new_quest.description}")
 
@@ -630,6 +654,6 @@ class Game:
 if __name__ == "__main__":
     statuses_config = load_statuses_config("statuses.yaml")
     quests_db = load_all_quests("quests")
-    loader = EventLoader("events")
+    loader = EventLoader("events", statuses_config)
     game = Game(loader, statuses_config, quests_db, "characters")
     game.start()
