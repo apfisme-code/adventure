@@ -5,7 +5,7 @@ import yaml
 import re
 from typing import List, Optional, Dict, Any, Tuple, Set, Union
 
-# ------------------- Загрузка конфигураций -------------------
+# ------------------- Загрузка конфигурации статусов -------------------
 
 def load_statuses_config(filepath: str = "statuses.yaml") -> Dict[str, Dict]:
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -51,7 +51,6 @@ class City:
 
 
 class Condition:
-    """Условие на статус: имя, оператор, значение."""
     def __init__(self, status: str, operator: str, value: Union[int, bool]):
         self.status = status
         self.operator = operator
@@ -78,19 +77,17 @@ class Condition:
 
     @staticmethod
     def parse(condition_dict: Dict[str, str]) -> 'Condition':
-        
         status = condition_dict.get('status', None)
-        operator = condition_dict.get('operator', None) 
-        value = condition_dict.get('value', None) 
-        
+        operator = condition_dict.get('operator', None)
+        value = condition_dict.get('value', None)
+
         if status is None or operator is None or value is None:
             raise ValueError(f"Некорректное условие: {condition_dict}")
-            
+
         if not re.match(r'([><=!]+)(.+)', operator):
             raise ValueError(f"Некорректный оператор: {operator} в условии: {condition_dict}")
-            
+
         return Condition(status, operator, value)
-        
 
     def __repr__(self):
         return f"{self.status} {self.operator} {self.value}"
@@ -101,13 +98,15 @@ class Outcome:
                  status_changes: Optional[Dict[str, Union[int, bool]]] = None,
                  add_quest: Optional[str] = None,
                  complete_quest: bool = False,
-                 fail_quest: bool = False):
+                 fail_quest: bool = False,
+                 next_event: Optional[str] = None):
         self.text = text
         self.success_level = success_level
         self.status_changes = status_changes or {}
         self.add_quest = add_quest
         self.complete_quest = complete_quest
         self.fail_quest = fail_quest
+        self.next_event = next_event  # может быть id события или "tag:тег"
 
 
 class Choice:
@@ -121,8 +120,9 @@ class Choice:
 
 
 class Event:
-    def __init__(self, text: str, choices: List[Choice], tags: List[str],
-                 is_goal_event: bool = False, requires: Optional[List[Condition]] = None):
+    def __init__(self, event_id: str, text: str, choices: List[Choice], tags: List[str],
+                  is_goal_event: bool = False, requires: Optional[List[Condition]] = None):
+        self.id = event_id
         self.text = text
         self.choices = choices
         self.tags = tags
@@ -131,68 +131,6 @@ class Event:
 
     def matches_place(self, place_tags: Set[str]) -> bool:
         return all(tag in place_tags for tag in self.tags)
-
-
-# ------------------- Загрузчик событий -------------------
-
-class EventLoader:
-    def __init__(self, events_dir: str = "events"):
-        self.events_dir = events_dir
-        self._tag_cache: Dict[str, List[Event]] = {}
-        self._load_all()
-
-    def _load_all(self):
-        pattern = os.path.join(self.events_dir, "*.yaml")
-        yaml_files = glob.glob(pattern) + glob.glob(os.path.join(self.events_dir, "*.yml"))
-        for filepath in yaml_files:
-            try:
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    data = yaml.safe_load(f)
-                    if not data:
-                        continue
-                    tags = data.get("tags", [])
-                    event = self._parse_event(data)
-                    if event:
-                        for tag in tags:
-                            self._tag_cache.setdefault(tag, []).append(event)
-            except Exception as e:
-                print(f"Ошибка загрузки события {filepath}: {e}")
-
-    def _parse_event(self, data: Dict[str, Any]) -> Optional[Event]:
-        try:
-            text = data["text"]
-            is_goal = data.get("is_goal_event", False)
-            tags = data.get("tags", [])
-            requires = self._parse_conditions(data.get("requires", []))
-            choices_data = data.get("choices", [])
-            choices = []
-            for choice_item in choices_data:
-                choice_text = choice_item["text"]
-                choice_requires = self._parse_conditions(choice_item.get("requires", []))
-                outcomes_data = choice_item.get("outcomes", [])
-                outcomes = []
-                for out in outcomes_data:
-                    level = out["success_level"]
-                    changes = out.get("status_changes", {})
-                    add_quest = out.get("add_quest")
-                    complete_quest = out.get("complete_quest", False)
-                    fail_quest = out.get("fail_quest", False)
-                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, fail_quest))
-                choices.append(Choice(choice_text, outcomes, choice_requires))
-            return Event(text, choices, tags, is_goal, requires)
-        except KeyError as e:
-            print(f"Ошибка в данных события: {e}")
-            return None
-
-    def _parse_conditions(self, raw_conditions: List[Dict[str, str]]) -> List[Condition]:
-        conditions = []
-        for cond_dict in raw_conditions:
-            conditions.append(Condition.parse(cond_dict))
-        return conditions
-
-    def get_events_by_tag(self, tag: str) -> List[Event]:
-        return self._tag_cache.get(tag, [])
-
 
 # ------------------- Система квестов -------------------
 
@@ -217,6 +155,80 @@ class Quest:
 
     def check_completion(self, player_statuses: Dict[str, Union[int, bool]]) -> bool:
         return all(c.check(player_statuses) for c in self.conditions)
+
+# ------------------- Загрузчик событий из файлов -------------------
+
+class EventLoader:
+    def __init__(self, events_dir: str = "events"):
+        self.events_dir = events_dir
+        self._tag_cache: Dict[str, List[Event]] = {}
+        self._id_cache: Dict[str, Event] = {}
+        self._load_all()
+
+    def _load_all(self):
+        pattern = os.path.join(self.events_dir, "**", "*.yaml")
+        yaml_files = glob.glob(pattern, recursive=True) + glob.glob(os.path.join(self.events_dir, "**", "*.yml"), recursive=True)
+        for filepath in yaml_files:
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = yaml.safe_load(f)
+                    if not data:
+                        continue
+                    # Определяем id: либо из поля, либо из имени файла без расширения
+                    event_id = data.get("id", os.path.splitext(os.path.basename(filepath))[0])
+                    tags = data.get("tags", [])
+                    event = self._parse_event(data, event_id)
+                    if event:
+                        self._id_cache[event_id] = event
+                        for tag in tags:
+                            self._tag_cache.setdefault(tag, []).append(event)
+            except Exception as e:
+                print(f"Ошибка при загрузке файла {filepath}: {e}")
+
+    def _parse_event(self, data: Dict[str, Any], event_id: str) -> Optional[Event]:
+        try:
+            text = data["text"]
+            is_goal = data.get("is_goal_event", False)
+            tags = data.get("tags", [])
+            requires = self._parse_conditions(data.get("requires", []))
+            choices_data = data.get("choices", [])
+            choices = []
+            for choice_item in choices_data:
+                choice_text = choice_item["text"]
+                choice_requires = self._parse_conditions(choice_item.get("requires", []))
+                outcomes_data = choice_item.get("outcomes", [])
+                outcomes = []
+                for out in outcomes_data:
+                    level = out["success_level"]
+                    changes = out.get("status_changes", {})
+                    add_quest = out.get("add_quest")
+                    complete_quest = out.get("complete_quest", False)
+                    fail_quest = out.get("fail_quest", False)
+                    next_event = out.get("next_event")  # строка или None
+                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, fail_quest, next_event))
+                choices.append(Choice(choice_text, outcomes, choice_requires))
+            return Event(event_id, text, choices, tags, is_goal, requires)
+        except KeyError as e:
+            print(f"Ошибка в данных события {event_id}: отсутствует поле {e}")
+            return None
+
+    def _parse_conditions(self, raw_conditions: List[Dict[str, str]]) -> List[Condition]:
+        conditions = []
+        for cond_dict in raw_conditions:
+            conditions.append(Condition.parse(cond_dict))
+        return conditions
+
+    def get_events_by_tag(self, tag: str) -> List[Event]:
+        return self._tag_cache.get(tag, [])
+
+    def get_event_by_id(self, event_id: str) -> Optional[Event]:
+        return self._id_cache.get(event_id)
+
+    def get_random_event_by_tag(self, tag: str) -> Optional[Event]:
+        events = self._tag_cache.get(tag, [])
+        if not events:
+            return None
+        return random.choice(events)
 
 
 # ------------------- Игровой движок -------------------
@@ -251,22 +263,25 @@ class Player:
         self.current_city = None  # будет установлен позже
         self.history: List[Dict] = []
         self.game_over = False
+        self.in_event_chain = False  # флаг, что мы внутри цепочки событий (нельзя перемещаться)
 
     def move_to(self, city: City):
+        if self.in_event_chain:
+            print("Вы не можете перемещаться, пока не завершите цепочку событий!")
+            return False
         self.current_city = city
         self.history.append({"action": "move", "to": city.name})
+        return True
 
     def add_event_record(self, event_type: str, event: Event, choice: Choice,
-                         outcome: Outcome, status_changes: Optional[Dict] = None,
-                         quest_changes: Optional[List[str]] = None):
+                         outcome: Outcome, status_changes: Optional[Dict[str, Union[int, bool]]] = None):
         self.history.append({
             "type": event_type,
             "event": event.text,
             "choice": choice.text,
             "outcome": outcome.text,
             "success_level": outcome.success_level,
-            "status_changes": status_changes or {},
-            "quest_changes": quest_changes or []
+            "status_changes": status_changes or {}
         })
 
     def apply_status_changes(self, changes: Dict[str, Union[int, bool]]):
@@ -292,7 +307,7 @@ class Player:
                 self.statuses[status] = value
 
     def has_conditions(self, conditions: List[Condition]) -> bool:
-        return all(c.check(self.statuses) for c in conditions)
+        return all(cond.check(self.statuses) for cond in conditions)
 
     def get_current_quest(self) -> Optional[Quest]:
         if self.quest_stack:
@@ -329,6 +344,7 @@ class Player:
 
 
 class Game:
+
     def __init__(self, loader: EventLoader, statuses_config: Dict[str, Dict],
                  quests_db: Dict[str, Dict], characters_dir: str = "characters"):
         self.loader = loader
@@ -412,41 +428,53 @@ class Game:
             self.player.current_city = self.cities[start_city_name]
         else:
             self.player.current_city = random.choice(list(self.cities.values()))
+
         self.current_edge_tag = None
 
+        print(f"Добро пожаловать в игру-путешествие по сказочному миру!")
         print(f"Вы начинаете в городе {self.player.current_city.name} (тип: {self.player.current_city.tag}).")
         print("Ваша цель: выполнить все квесты.\n")
+        print("Путешествуйте, делайте выборы, развивайте свои навыки и достигните цели!\n")
 
         self.city_events = self.loader.get_events_by_tag("city")
         self.travel_events = self.loader.get_events_by_tag("travel")
-
+        
         if not self.city_events:
             print("ВНИМАНИЕ: Не найдено городских событий (тег 'city').")
         if not self.travel_events:
             print("ВНИМАНИЕ: Не найдено событий в пути (тег 'travel').")
 
         while not self.player.game_over:
-            self.show_status()
-            self.handle_move()
-            if self.player.game_over:
-                break
-            if random.random() < 0.3 and self.travel_events:
-                self.handle_travel_event()
+            if not self.player.in_event_chain:
+                self.show_status()
+                self.handle_move()
                 if self.player.game_over:
                     break
-            if self.city_events:
-                self.handle_city_event()
-                if self.player.game_over:
-                    break
+                # Событие в пути с вероятностью 30%
+                if random.random() < 0.3 and self.travel_events:
+                    self.handle_travel_event()
+                    if self.player.game_over:
+                        break
+                # Городское событие
+                if self.city_events:
+                    self.handle_city_event()
+                    if self.player.game_over:
+                        break
+                else:
+                    print("Нет доступных городских событий. Игра завершена.")
+                    self.player.game_over = True
             else:
-                print("Нет доступных городских событий. Игра завершена.")
-                self.player.game_over = True
+                # Если мы в цепочке, не даём перемещаться, только обрабатываем следующее событие
+                # (у нас уже есть next_event, которое мы обработаем в process_event)
+                # Но мы должны ждать, пока цепочка не закончится.
+                # В process_event мы будем вызывать следующий, и он установит флаг обратно.
+                pass
 
         print("\n=== Игра завершена ===")
         if self.player.check_win_condition():
-            print("Поздравляем! Вы выполнили все квесты и победили!")
+            print("Поздравляем! Вы выполнили все квесты и победили!")        
         else:
-            print("Вы не выполнили все квесты.")
+            print("Вы не достигли цели.")
         self.print_statuses("Финальные статусы")
         self.print_quests()
         print("Ваш путь:")
@@ -457,13 +485,16 @@ class Game:
                 print(f"  {record['type']}: {record['event']}")
                 print(f"    Выбор: {record['choice']} -> {record['outcome']} ({record['success_level']})")
                 if record.get("status_changes"):
-                    for stat, delta in record["status_changes"].items():
+                    changes = record["status_changes"]
+                    for stat, delta in changes.items():
                         if isinstance(delta, bool):
                             print(f"    {stat}: {'установлен' if delta else 'сброшен'}")
                         else:
                             print(f"    {stat}: {delta:+d}")
                 if record.get("quest_changes"):
                     print(f"    Квесты: {', '.join(record['quest_changes'])}")
+        print(f"Цель: {self.player.goal.status} {self.player.goal.operator} {self.player.goal.value} | " +
+              f"Текущее: {self.player.statuses.get(self.player.goal.status)}")
 
     def show_status(self):
         print(f"\n--- Текущий город: {self.player.current_city.name} (тип: {self.player.current_city.tag}) ---")
@@ -483,12 +514,12 @@ class Game:
                 if 1 <= choice <= len(neighbors):
                     target = neighbors[choice-1]
                     self.current_edge_tag = self.get_edge_tag(self.player.current_city, target)
-                    self.player.move_to(target)
-                    print(f"\nВы перешли в {target.name}.")
-                    self.print_statuses("Ваши статусы после перемещения")
-                    break
+                    if self.player.move_to(target):
+                        print(f"\nВы перешли в {target.name}.")
+                        self.print_statuses("Ваши статусы после перемещения")
+                        break
                 else:
-                    print("Неверный номер.")
+                    print("Неверный номер. Попробуйте снова.")
             except ValueError:
                 print("Введите число.")
 
@@ -499,7 +530,7 @@ class Game:
         candidates = [ev for ev in self.travel_events if ev.matches_place(place_tags)]
         available = self.get_available_events(candidates)
         if not available:
-            print(f"Нет событий в пути через {self.current_edge_tag}.")
+            print(f"Нет подходящих событий в пути через {self.current_edge_tag}.")
             return
         event = random.choice(available)
         print(f"\n[В пути через {self.current_edge_tag}] {event.text}")
@@ -510,16 +541,20 @@ class Game:
         candidates = [ev for ev in self.city_events if ev.matches_place(place_tags)]
         available = self.get_available_events(candidates)
         if not available:
-            print(f"Нет событий в городе {self.player.current_city.name}.")
+            print(f"Нет подходящих событий в городе {self.player.current_city.name}.")
             return
         event = random.choice(available)
         print(f"\n[Город {self.player.current_city.name} ({self.player.current_city.tag})] {event.text}")
         self.process_event(event, "city")
 
     def process_event(self, event: Event, event_type: str):
+        # Устанавливаем флаг цепочки (если событие имеет next_event, он останется)
+        self.player.in_event_chain = True
+
         available_choices = self.get_available_choices(event.choices)
         if not available_choices:
-            print("Нет доступных вариантов для ваших статусов.")
+            print("Нет доступных вариантов для ваших статусов. Событие пропущено.")
+            self.player.in_event_chain = False
             return
 
         for i, choice in enumerate(available_choices):
@@ -528,7 +563,7 @@ class Game:
 
         while True:
             try:
-                idx = int(input("Ваш выбор: ")) - 1
+                idx = int(input("Ваш выбор (номер): ")) - 1
                 if 0 <= idx < len(available_choices):
                     chosen_choice = available_choices[idx]
                     break
@@ -540,18 +575,20 @@ class Game:
         outcome = chosen_choice.resolve()
         print(f"Результат: {outcome.text}")
 
-        # Обработка изменений статусов
-        status_changes = outcome.status_changes
-        if status_changes:
-            old_values = {s: self.player.statuses.get(s) for s in status_changes.keys()}
-            self.player.apply_status_changes(status_changes)
-            for status, delta in status_changes.items():
+        # Применяем изменения статусов
+        if outcome.status_changes:
+            old_values = {s: self.player.statuses.get(s) for s in outcome.status_changes.keys()}
+            self.player.apply_status_changes(outcome.status_changes)
+            for status, delta in outcome.status_changes.items():
                 new_val = self.player.statuses.get(status)
                 old_val = old_values.get(status)
                 if isinstance(delta, bool):
                     print(f"{status}: {'да' if new_val else 'нет'} (было: {'да' if old_val else 'нет'})")
                 else:
                     print(f"{status}: {old_val} → {new_val} ({delta:+d})")
+            self.print_statuses("Обновлённые статусы")
+        else:
+            self.print_statuses("Ваши статусы")
 
         # Обработка квестов
         quest_changes = []
@@ -580,11 +617,32 @@ class Game:
                 quest_changes.append(f"Добавлен квест: {new_quest.name}")
                 print(f"Новый квест: {new_quest.name} - {new_quest.description}")
 
-        self.player.add_event_record(event_type, event, chosen_choice, outcome, status_changes, quest_changes)
+        self.player.add_event_record(event_type, event, chosen_choice, outcome, outcome.status_changes)
 
-        # После всех изменений выводим текущее состояние
-        self.print_statuses("Обновлённые статусы")
-        self.print_quests()
+
+        # Обработка перехода к следующему событию
+        if outcome.next_event:
+            next_event_ref = outcome.next_event
+            if next_event_ref.startswith("tag:"):
+                tag = next_event_ref[4:]
+                next_event = self.loader.get_random_event_by_tag(tag)
+                if not next_event:
+                    print(f"Нет событий с тегом '{tag}'. Цепочка прервана.")
+                    self.player.in_event_chain = False
+                    return
+                print(f"\n--- Переход к случайному событию с тегом '{tag}' ---")
+                self.process_event(next_event, "chain")
+            else:
+                next_event = self.loader.get_event_by_id(next_event_ref)
+                if not next_event:
+                    print(f"Событие с id '{next_event_ref}' не найдено. Цепочка прервана.")
+                    self.player.in_event_chain = False
+                    return
+                print(f"\n--- Переход к событию '{next_event.id}' ---")
+                self.process_event(next_event, "chain")
+        else:
+            # Цепочка завершена
+            self.player.in_event_chain = False
 
 
 # ------------------- Запуск -------------------

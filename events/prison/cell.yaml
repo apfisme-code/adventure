@@ -1,0 +1,21 @@
+id: prison_cell
+text: "Вы в тюремной камере. Решётка заперта, снаружи слышны шаги стражи."
+tags:
+  - тюрьма
+choices:
+  - text: "Попытаться взломать замок"
+    requires: [{"взлом": "==true"}]
+    outcomes:
+      - text: "Вы взломали замок и вышли в коридор."
+        success_level: success
+        next_event: "prison_corridor"
+  - text: "Крикнуть, чтобы привлекли внимание"
+    outcomes:
+      - text: "Пришла стража и отвела вас к начальнику."
+        success_level: neutral
+        next_event: "prison_guard"
+  - text: "Ждать"
+    outcomes:
+      - text: "Вы ждёте... (ничего не происходит)"
+        success_level: neutral
+        next_event: "tag:тюрьма"  # случайное другое тюремное событие

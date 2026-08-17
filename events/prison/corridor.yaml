@@ -1,0 +1,15 @@
+id: prison_corridor
+text: "Вы в коридоре. Слева слышны голоса, справа - выход."
+tags:
+  - тюрьма
+choices:
+  - text: "Пойти на голоса"
+    outcomes:
+      - text: "Вы попали в столовую, где другие заключённые."
+        success_level: neutral
+        next_event: "prison_canteen"
+  - text: "Пойти к выходу"
+    outcomes:
+      - text: "Вы нашли выход, но он охраняется."
+        success_level: neutral
+        next_event: "prison_exit_guarded"

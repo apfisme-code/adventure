@@ -1,0 +1,15 @@
+id: road_bandits
+text: "Вы видите следы бандитов на дороге. Они ведут в лес."
+tags:
+  - travel
+  - лес
+choices:
+  - text: "Проследить за следами"
+    outcomes:
+      - text: "Вы проследили и нашли их логово."
+        success_level: success
+        next_event: "bandit_lair"
+  - text: "Игнорировать и идти дальше"
+    outcomes:
+      - text: "Вы продолжили путь."
+        success_level: neutral

@@ -1,0 +1,16 @@
+id: bandit_treasure
+text: "В логове вы нашли сундук с сокровищами! Вы забираете его."
+tags:
+  - city
+  - деревня
+choices:
+  - text: "Забрать сокровища"
+    outcomes:
+      - text: "Вы стали богаче! Теперь вы можете купить всё, что пожелаете."
+        success_level: success
+        status_changes: {"богатство": 5}
+  - text: "Раздать бедным"
+    outcomes:
+      - text: "Вы прославились как благодетель."
+        success_level: success
+        status_changes: {"известность": 3}

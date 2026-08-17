@@ -1,0 +1,31 @@
+id: bandit_lair
+text: "Вы нашли логово бандитов. Они окружены и готовы к бою. В углу виднеется клетка."
+tags:
+  - city
+  - деревня
+choices:
+  - text: "Атаковать бандитов"
+    requires: [{"фехтование": "==true"}]
+    outcomes:
+      - text: "Вы победили бандитов и освободили пленников."
+        success_level: success
+        status_changes: {"богатство": 3, "известность": 2}
+        next_event: "bandit_treasure"
+  - text: "Попытаться договориться"
+    requires: [{"красноречие": ">=2"}]
+    outcomes:
+      - text: "Вы договорились, бандиты ушли, оставив часть добычи."
+        success_level: neutral
+        status_changes: {"богатство": 1}
+  - text: "Попытаться освободить пленников скрытно"
+    requires: [{"взлом": "==true"}]
+    outcomes:
+      - text: "Вы освободили пленников, но бандиты заметили и поймали вас."
+        success_level: fail
+        status_changes: {"известность": -1}
+        next_event: "tag:тюрьма"
+  - text: "Сбежать"
+    outcomes:
+      - text: "Вы сбежали, но бандиты будут преследовать."
+        success_level: fail
+        status_changes: {"известность": -1}

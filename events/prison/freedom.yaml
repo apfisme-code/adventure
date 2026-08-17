@@ -1,0 +1,10 @@
+id: prison_freedom
+text: "Вы вышли на свободу! Наконец-то вы на воле."
+tags:
+  - тюрьма
+choices:
+  - text: "Продолжить путешествие"
+    outcomes:
+      - text: "Вы возвращаетесь в город и продолжаете свой путь."
+        success_level: success
+        # нет next_event, цепочка завершается

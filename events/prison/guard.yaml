@@ -1,0 +1,26 @@
+id: prison_guard
+text: "Перед вами начальник тюрьмы. Он предлагает вам сделку: работа на него за свободу."
+tags:
+  - тюрьма
+choices:
+  - text: "Согласиться"
+    requires: [{"красноречие": ">=2"}]
+    outcomes:
+      - text: "Вы согласились, он выпускает вас."
+        success_level: success
+        status_changes: {"известность": -1}  # скомпрометированы
+        next_event: "prison_freedom"
+  - text: "Отказаться и попытаться сбежать"
+    requires: [{"фехтование": "==true"}]
+    outcomes:
+      - text: "Вы напали на начальника и сбежали."
+        success_level: success
+        status_changes: {"известность": 2}
+        next_event: "prison_escape"
+  - text: "Попытаться подкупить"
+    requires: [{"богатство": ">=3"}]
+    outcomes:
+      - text: "Вы подкупили начальника и он отпустил вас."
+        success_level: success
+        status_changes: {"богатство": -2}
+        next_event: "prison_freedom"
