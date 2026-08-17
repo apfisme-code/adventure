@@ -1,0 +1,12 @@
+id: "cursed_quest"
+name: "Снятие проклятия"
+description: "Вы были прокляты. Найдите способ снять проклятие."
+conditions:
+  - status: "проклят"
+    operator: "=="
+    value: false   # нужно, чтобы проклятие было снято
+on_complete:
+  # После снятия проклятия – финальный квест
+  add_quest: "final_quest"
+  status_changes:
+    мудрость: 2

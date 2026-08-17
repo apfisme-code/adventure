@@ -1,8 +1,10 @@
 id: initial_goal
 title: "Стать знаменитым"
 description: "Достигните известности не менее 3"
-condition:
-  известность: ">=3"
+conditions:
+  - status: "фехтование"
+    operator: ">="
+    value: 3
 on_complete:
   известность: 1   # бонус при выполнении
 is_initial: true

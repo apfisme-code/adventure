@@ -1,4 +1,7 @@
 id: initial_fame
 name: "Стать знаменитым"
 description: "Добейтесь известности, чтобы ваше имя знали все."
-condition: {"известность": ">=3"}
+conditions:
+  - status: "известность"
+    operator: ">="
+    value: 3

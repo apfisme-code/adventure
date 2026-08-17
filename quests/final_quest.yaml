@@ -1,0 +1,13 @@
+id: "final_quest"
+name: "Великое приключение"
+description: "Теперь вы свободны от проклятия. Достигните вершины."
+conditions:
+  - status: "богатство"
+    operator: ">="
+    value: 5
+  - status: "известность"
+    operator: ">="
+    value: 4
+on_complete:
+  # финал игры: можно ничего не делать, игра завершится автоматически
+  status_changes: {}

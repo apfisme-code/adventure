@@ -1,4 +1,7 @@
 id: initial_fencing
 name: "Стать фехтовальщиком"
 description: "Овладейте искусством фехтования."
-condition: {"фехтование": "==true"}
+conditions:
+  - status: "фехтование"
+    operator: "=="
+    value: true

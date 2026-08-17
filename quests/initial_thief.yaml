@@ -1,4 +1,7 @@
 id: initial_thief
 name: "Стать взломщиком"
 description: "Научитесь открывать любые замки."
-condition: {"взлом": "==true"}
+conditions:
+  - status: "взлом"
+    operator: "=="
+    value: true

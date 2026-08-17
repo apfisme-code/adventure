@@ -1,0 +1,12 @@
+name: "Маг"
+description: "Изучает древние тайны и стремится к знаниям."
+start_city: "E"
+statuses:
+  богатство: 0
+  известность: 1
+  мудрость: 3
+  красноречие: 1
+  фехтование: false
+  взлом: false
+  проклят: false
+goal_quest: "initial_quest"

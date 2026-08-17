@@ -5,16 +5,53 @@ import yaml
 import re
 from typing import List, Optional, Dict, Any, Tuple, Set, Union
 
-# ------------------- Загрузка конфигурации статусов -------------------
+# ------------------- Загрузка конфигураций -------------------
 
 def load_statuses_config(filepath: str = "statuses.yaml") -> Dict[str, Dict]:
     with open(filepath, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
     return data.get("statuses", {})
 
-# ------------------- Загрузка квестов -------------------
+def load_character(filepath: str) -> Dict:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+def load_quest(filepath: str) -> Dict:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+def load_all_quests(quests_dir: str = "quests") -> Dict[str, Dict]:
+    """Загружает все квесты из папки, возвращает словарь {id: quest_data}."""
+    quests = {}
+    pattern = os.path.join(quests_dir, "*.yaml")
+    yaml_files = glob.glob(pattern) + glob.glob(os.path.join(quests_dir, "*.yml"))
+    for filepath in yaml_files:
+        try:
+            data = load_quest(filepath)
+            if data and "id" in data:
+                quests[data["id"]] = data
+        except Exception as e:
+            print(f"Ошибка загрузки квеста {filepath}: {e}")
+    return quests
+
+# ------------------- Модели данных -------------------
+
+class City:
+    def __init__(self, name: str, tag: str):
+        self.name = name
+        self.tag = tag
+        self.neighbors: List['City'] = []
+
+    def add_neighbor(self, other: 'City'):
+        if other not in self.neighbors:
+            self.neighbors.append(other)
+
+    def __repr__(self):
+        return self.name
+
 
 class Condition:
+    """Условие на статус: имя, оператор, значение."""
     def __init__(self, status: str, operator: str, value: Union[int, bool]):
         self.status = status
         self.operator = operator
@@ -41,82 +78,36 @@ class Condition:
 
     @staticmethod
     def parse(condition_dict: Dict[str, str]) -> 'Condition':
-        for status, expr in condition_dict.items():
-            op_match = re.match(r'([><=!]+)(.+)', expr)
-            if op_match:
-                operator, raw_value = op_match.groups()
-                if raw_value.lower() == 'true':
-                    value = True
-                elif raw_value.lower() == 'false':
-                    value = False
-                else:
-                    try:
-                        value = int(raw_value)
-                    except ValueError:
-                        raise ValueError(f"Некорректное значение условия: {expr}")
-                return Condition(status, operator, value)
-        raise ValueError(f"Некорректное условие: {condition_dict}")
+        
+        status = condition_dict.get('status', None)
+        operator = condition_dict.get('operator', None) 
+        value = condition_dict.get('value', None) 
+        
+        if status is None or operator is None or value is None:
+            raise ValueError(f"Некорректное условие: {condition_dict}")
+            
+        if not re.match(r'([><=!]+)(.+)', operator):
+            raise ValueError(f"Некорректный оператор: {operator} в условии: {condition_dict}")
+            
+        return Condition(status, operator, value)
+        
 
     def __repr__(self):
         return f"{self.status} {self.operator} {self.value}"
 
-class Quest:
-    def __init__(self, quest_id: str, name: str, description: str, condition: Condition):
-        self.id = quest_id
-        self.name = name
-        self.description = description
-        self.condition = condition
-
-    def is_completed(self, player_statuses: Dict[str, Union[int, bool]]) -> bool:
-        return self.condition.check(player_statuses)
-
-def load_quests(quests_dir: str = "quests") -> Dict[str, Quest]:
-    """Загружает все квесты из YAML-файлов и возвращает словарь id -> Quest."""
-    quests = {}
-    pattern = os.path.join(quests_dir, "*.yaml")
-    yaml_files = glob.glob(pattern) + glob.glob(os.path.join(quests_dir, "*.yml"))
-    for filepath in yaml_files:
-        try:
-            with open(filepath, 'r', encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-                if not data:
-                    continue
-                quest_id = data.get("id")
-                if not quest_id:
-                    print(f"Пропущен файл {filepath}: отсутствует id")
-                    continue
-                name = data.get("name", quest_id)
-                description = data.get("description", "")
-                raw_condition = data.get("condition", {})
-                condition = Condition.parse(raw_condition)  # один словарь
-                quests[quest_id] = Quest(quest_id, name, description, condition)
-        except Exception as e:
-            print(f"Ошибка при загрузке квеста {filepath}: {e}")
-    return quests
-
-# ------------------- Модели данных -------------------
-
-class City:
-    def __init__(self, name: str, tag: str):
-        self.name = name
-        self.tag = tag
-        self.neighbors: List['City'] = []
-
-    def add_neighbor(self, other: 'City'):
-        if other not in self.neighbors:
-            self.neighbors.append(other)
-
-    def __repr__(self):
-        return self.name
-
 
 class Outcome:
-    def __init__(self, text: str, success_level: str, status_changes: Optional[Dict[str, Union[int, bool]]] = None,
-                 add_quest: Optional[str] = None):
+    def __init__(self, text: str, success_level: str,
+                 status_changes: Optional[Dict[str, Union[int, bool]]] = None,
+                 add_quest: Optional[str] = None,
+                 complete_quest: bool = False,
+                 fail_quest: bool = False):
         self.text = text
         self.success_level = success_level
         self.status_changes = status_changes or {}
-        self.add_quest = add_quest   # id квеста, который добавляется в стек
+        self.add_quest = add_quest
+        self.complete_quest = complete_quest
+        self.fail_quest = fail_quest
 
 
 class Choice:
@@ -142,7 +133,7 @@ class Event:
         return all(tag in place_tags for tag in self.tags)
 
 
-# ------------------- Загрузчик событий из файлов -------------------
+# ------------------- Загрузчик событий -------------------
 
 class EventLoader:
     def __init__(self, events_dir: str = "events"):
@@ -165,7 +156,7 @@ class EventLoader:
                         for tag in tags:
                             self._tag_cache.setdefault(tag, []).append(event)
             except Exception as e:
-                print(f"Ошибка при загрузке файла {filepath}: {e}")
+                print(f"Ошибка загрузки события {filepath}: {e}")
 
     def _parse_event(self, data: Dict[str, Any]) -> Optional[Event]:
         try:
@@ -183,12 +174,14 @@ class EventLoader:
                 for out in outcomes_data:
                     level = out["success_level"]
                     changes = out.get("status_changes", {})
-                    add_quest = out.get("add_quest")  # может быть строка
-                    outcomes.append(Outcome(out["text"], level, changes, add_quest))
+                    add_quest = out.get("add_quest")
+                    complete_quest = out.get("complete_quest", False)
+                    fail_quest = out.get("fail_quest", False)
+                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, fail_quest))
                 choices.append(Choice(choice_text, outcomes, choice_requires))
             return Event(text, choices, tags, is_goal, requires)
         except KeyError as e:
-            print(f"Ошибка в данных события: отсутствует поле {e}")
+            print(f"Ошибка в данных события: {e}")
             return None
 
     def _parse_conditions(self, raw_conditions: List[Dict[str, str]]) -> List[Condition]:
@@ -201,19 +194,61 @@ class EventLoader:
         return self._tag_cache.get(tag, [])
 
 
+# ------------------- Система квестов -------------------
+
+class Quest:
+    def __init__(self, quest_id: str, name: str, description: str,
+                 conditions: List[Condition],
+                 on_complete: Dict, on_fail: Dict = None):
+        self.id = quest_id
+        self.name = name
+        self.description = description
+        self.conditions = conditions
+        self.on_complete = on_complete or {}
+        self.on_fail = on_fail or {}
+
+    @staticmethod
+    def from_data(data: Dict) -> 'Quest':
+        conditions = [Condition.parse(c) for c in data.get("conditions", [])]
+        on_complete = data.get("on_complete", {})
+        on_fail = data.get("on_fail", {})
+        return Quest(data["id"], data["name"], data["description"],
+                     conditions, on_complete, on_fail)
+
+    def check_completion(self, player_statuses: Dict[str, Union[int, bool]]) -> bool:
+        return all(c.check(player_statuses) for c in self.conditions)
+
+
 # ------------------- Игровой движок -------------------
 
 class Player:
-    def __init__(self, start_city: City, quest_stack: List[Quest], statuses_config: Dict[str, Dict]):
-        self.current_city = start_city
-        self.quest_stack = quest_stack  # стек квестов, последний – текущий
+    def __init__(self, character_data: Dict, statuses_config: Dict[str, Dict],
+                 quests_db: Dict[str, Dict]):
+        self.name = character_data["name"]
+        self.description = character_data["description"]
         self.statuses_config = statuses_config
+        self.quests_db = quests_db
+        # Инициализация статусов
         self.statuses = {}
         for name, info in statuses_config.items():
             if info["type"] == "numeric":
                 self.statuses[name] = info.get("default", 0)
             elif info["type"] == "boolean":
                 self.statuses[name] = info.get("default", False)
+        # Переопределяем начальными из персонажа
+        if "statuses" in character_data:
+            for stat, val in character_data["statuses"].items():
+                if stat in self.statuses:
+                    self.statuses[stat] = val
+
+        # Квесты: стек (последний – текущий)
+        self.quest_stack: List[Quest] = []
+        # Добавляем начальный квест
+        start_quest_id = character_data["goal_quest"]
+        if start_quest_id in self.quests_db:
+            self.quest_stack.append(Quest.from_data(self.quests_db[start_quest_id]))
+
+        self.current_city = None  # будет установлен позже
         self.history: List[Dict] = []
         self.game_over = False
 
@@ -222,8 +257,8 @@ class Player:
         self.history.append({"action": "move", "to": city.name})
 
     def add_event_record(self, event_type: str, event: Event, choice: Choice,
-                         outcome: Outcome, status_changes: Optional[Dict[str, Union[int, bool]]] = None,
-                         added_quest: Optional[str] = None):
+                         outcome: Outcome, status_changes: Optional[Dict] = None,
+                         quest_changes: Optional[List[str]] = None):
         self.history.append({
             "type": event_type,
             "event": event.text,
@@ -231,7 +266,7 @@ class Player:
             "outcome": outcome.text,
             "success_level": outcome.success_level,
             "status_changes": status_changes or {},
-            "added_quest": added_quest
+            "quest_changes": quest_changes or []
         })
 
     def apply_status_changes(self, changes: Dict[str, Union[int, bool]]):
@@ -257,36 +292,49 @@ class Player:
                 self.statuses[status] = value
 
     def has_conditions(self, conditions: List[Condition]) -> bool:
-        return all(cond.check(self.statuses) for cond in conditions)
-
-    def add_quest(self, quest: Quest):
-        """Добавляет квест в стек (становится текущим)."""
-        self.quest_stack.append(quest)
+        return all(c.check(self.statuses) for c in conditions)
 
     def get_current_quest(self) -> Optional[Quest]:
-        """Возвращает текущий (последний) квест или None, если стек пуст."""
         if self.quest_stack:
             return self.quest_stack[-1]
         return None
 
-    def check_current_quest(self) -> bool:
-        """Проверяет, выполнен ли текущий квест. Если да, удаляет его и возвращает True."""
-        current = self.get_current_quest()
-        if current and current.is_completed(self.statuses):
-            self.quest_stack.pop()
-            return True
-        return False
+    def complete_quest(self, quest: Quest) -> bool:
+        """Пытается завершить квест (проверяет условия). Возвращает True, если завершён."""
+        if not quest.check_completion(self.statuses):
+            return False
+        # Завершаем квест
+        # Применяем on_complete
+        if "status_changes" in quest.on_complete:
+            self.apply_status_changes(quest.on_complete["status_changes"])
+        # Добавляем новый квест, если указан
+        next_quest_id = quest.on_complete.get("add_quest")
+        if next_quest_id and next_quest_id in self.quests_db:
+            new_quest = Quest.from_data(self.quests_db[next_quest_id])
+            self.quest_stack.append(new_quest)
+        # Удаляем текущий из стека
+        self.quest_stack.remove(quest)
+        return True
 
-    def check_all_quests_done(self) -> bool:
-        """Проверяет, пуст ли стек квестов (все выполнены)."""
+    def fail_quest(self, quest: Quest):
+        """Проваливает квест: применяет on_fail, удаляет квест."""
+        if "status_changes" in quest.on_fail:
+            self.apply_status_changes(quest.on_fail["status_changes"])
+        # Удаляем
+        self.quest_stack.remove(quest)
+
+    def check_win_condition(self) -> bool:
+        """Победа, если стек квестов пуст."""
         return len(self.quest_stack) == 0
 
 
 class Game:
-    def __init__(self, loader: EventLoader, statuses_config: Dict[str, Dict], quests: Dict[str, Quest]):
+    def __init__(self, loader: EventLoader, statuses_config: Dict[str, Dict],
+                 quests_db: Dict[str, Dict], characters_dir: str = "characters"):
         self.loader = loader
         self.statuses_config = statuses_config
-        self.all_quests = quests
+        self.quests_db = quests_db
+        self.characters_dir = characters_dir
         self.cities, self.edge_tags = self._build_map()
         self.player = None
         self.current_edge_tag = None
@@ -337,27 +385,45 @@ class Game:
         else:
             print(f"{prefix}: нет")
 
-    def start(self):
-        # Выбор начального квеста случайным образом (из загруженных)
-        initial_quests = ['initial_wealth', 'initial_fame', 'initial_wise', 'initial_fencing', 'initial_thief']
-        available_initial = [qid for qid in initial_quests if qid in self.all_quests]
-        if not available_initial:
-            print("Нет начальных квестов! Проверьте папку quests.")
-            return
-        chosen_id = random.choice(available_initial)
-        initial_quest = self.all_quests[chosen_id]
+    def print_quests(self):
+        if self.player.quest_stack:
+            print("Активные квесты (последний – текущий):")
+            for i, q in enumerate(self.player.quest_stack):
+                marker = "→ " if i == len(self.player.quest_stack)-1 else "  "
+                print(f"  {marker}{q.name}: {q.description}")
+        else:
+            print("Нет активных квестов. Победа!")
 
-        start_city = random.choice(list(self.cities.values()))
-        self.player = Player(start_city, [initial_quest], self.statuses_config)
+    def start(self):
+        # Загружаем всех персонажей
+        char_files = glob.glob(os.path.join(self.characters_dir, "*.yaml")) + \
+                     glob.glob(os.path.join(self.characters_dir, "*.yml"))
+        if not char_files:
+            print("Нет файлов персонажей в папке characters/")
+            return
+        # Выбираем случайного персонажа
+        char_file = random.choice(char_files)
+        character_data = load_character(char_file)
+        print(f"Вы играете за {character_data['name']}: {character_data['description']}")
+
+        self.player = Player(character_data, self.statuses_config, self.quests_db)
+        start_city_name = character_data.get("start_city", "A")
+        if start_city_name in self.cities:
+            self.player.current_city = self.cities[start_city_name]
+        else:
+            self.player.current_city = random.choice(list(self.cities.values()))
         self.current_edge_tag = None
 
-        print(f"Добро пожаловать в игру-путешествие по сказочному миру!")
-        print(f"Вы начинаете в городе {start_city.name} (тип: {start_city.tag}).")
-        print(f"Ваш первый квест: {initial_quest.name} - {initial_quest.description}")
-        print("Путешествуйте, выполняйте квесты и создавайте свою историю!\n")
+        print(f"Вы начинаете в городе {self.player.current_city.name} (тип: {self.player.current_city.tag}).")
+        print("Ваша цель: выполнить все квесты.\n")
 
         self.city_events = self.loader.get_events_by_tag("city")
         self.travel_events = self.loader.get_events_by_tag("travel")
+
+        if not self.city_events:
+            print("ВНИМАНИЕ: Не найдено городских событий (тег 'city').")
+        if not self.travel_events:
+            print("ВНИМАНИЕ: Не найдено событий в пути (тег 'travel').")
 
         while not self.player.game_over:
             self.show_status()
@@ -377,11 +443,12 @@ class Game:
                 self.player.game_over = True
 
         print("\n=== Игра завершена ===")
-        if self.player.check_all_quests_done():
-            print("Поздравляем! Вы выполнили все квесты и завершили игру!")
+        if self.player.check_win_condition():
+            print("Поздравляем! Вы выполнили все квесты и победили!")
         else:
-            print("Игра прервана. Вы не выполнили все квесты.")
+            print("Вы не выполнили все квесты.")
         self.print_statuses("Финальные статусы")
+        self.print_quests()
         print("Ваш путь:")
         for record in self.player.history:
             if record.get("action") == "move":
@@ -395,18 +462,13 @@ class Game:
                             print(f"    {stat}: {'установлен' if delta else 'сброшен'}")
                         else:
                             print(f"    {stat}: {delta:+d}")
-                if record.get("added_quest"):
-                    q = self.all_quests.get(record["added_quest"])
-                    if q:
-                        print(f"    Добавлен квест: {q.name}")
+                if record.get("quest_changes"):
+                    print(f"    Квесты: {', '.join(record['quest_changes'])}")
 
     def show_status(self):
-        current_quest = self.player.get_current_quest()
-        quest_str = f"{current_quest.name} ({current_quest.condition})" if current_quest else "Нет активного квеста"
         print(f"\n--- Текущий город: {self.player.current_city.name} (тип: {self.player.current_city.tag}) ---")
-        print(f"Текущий квест: {quest_str}")
-        print(f"Осталось квестов: {len(self.player.quest_stack)}")
         self.print_statuses()
+        self.print_quests()
         neighbors = self.player.current_city.neighbors
         print("Доступные направления:")
         for i, city in enumerate(neighbors):
@@ -423,12 +485,10 @@ class Game:
                     self.current_edge_tag = self.get_edge_tag(self.player.current_city, target)
                     self.player.move_to(target)
                     print(f"\nВы перешли в {target.name}.")
-                    # Проверяем выполнение текущего квеста после перемещения
-                    self.check_and_update_quests()
                     self.print_statuses("Ваши статусы после перемещения")
                     break
                 else:
-                    print("Неверный номер. Попробуйте снова.")
+                    print("Неверный номер.")
             except ValueError:
                 print("Введите число.")
 
@@ -439,7 +499,7 @@ class Game:
         candidates = [ev for ev in self.travel_events if ev.matches_place(place_tags)]
         available = self.get_available_events(candidates)
         if not available:
-            print(f"Нет подходящих событий в пути через {self.current_edge_tag}.")
+            print(f"Нет событий в пути через {self.current_edge_tag}.")
             return
         event = random.choice(available)
         print(f"\n[В пути через {self.current_edge_tag}] {event.text}")
@@ -450,7 +510,7 @@ class Game:
         candidates = [ev for ev in self.city_events if ev.matches_place(place_tags)]
         available = self.get_available_events(candidates)
         if not available:
-            print(f"Нет подходящих событий в городе {self.player.current_city.name}.")
+            print(f"Нет событий в городе {self.player.current_city.name}.")
             return
         event = random.choice(available)
         print(f"\n[Город {self.player.current_city.name} ({self.player.current_city.tag})] {event.text}")
@@ -459,7 +519,7 @@ class Game:
     def process_event(self, event: Event, event_type: str):
         available_choices = self.get_available_choices(event.choices)
         if not available_choices:
-            print("Нет доступных вариантов для ваших статусов. Событие пропущено.")
+            print("Нет доступных вариантов для ваших статусов.")
             return
 
         for i, choice in enumerate(available_choices):
@@ -468,7 +528,7 @@ class Game:
 
         while True:
             try:
-                idx = int(input("Ваш выбор (номер): ")) - 1
+                idx = int(input("Ваш выбор: ")) - 1
                 if 0 <= idx < len(available_choices):
                     chosen_choice = available_choices[idx]
                     break
@@ -480,11 +540,12 @@ class Game:
         outcome = chosen_choice.resolve()
         print(f"Результат: {outcome.text}")
 
-        # Применяем изменения статусов
-        if outcome.status_changes:
-            old_values = {s: self.player.statuses.get(s) for s in outcome.status_changes.keys()}
-            self.player.apply_status_changes(outcome.status_changes)
-            for status, delta in outcome.status_changes.items():
+        # Обработка изменений статусов
+        status_changes = outcome.status_changes
+        if status_changes:
+            old_values = {s: self.player.statuses.get(s) for s in status_changes.keys()}
+            self.player.apply_status_changes(status_changes)
+            for status, delta in status_changes.items():
                 new_val = self.player.statuses.get(status)
                 old_val = old_values.get(status)
                 if isinstance(delta, bool):
@@ -492,46 +553,45 @@ class Game:
                 else:
                     print(f"{status}: {old_val} → {new_val} ({delta:+d})")
 
-        # Добавление квеста
-        added_quest_id = None
+        # Обработка квестов
+        quest_changes = []
+        current_quest = self.player.get_current_quest()
+        if outcome.complete_quest and current_quest:
+            if self.player.complete_quest(current_quest):
+                quest_changes.append(f"Квест '{current_quest.name}' завершён!")
+                if self.player.check_win_condition():
+                    print("Поздравляем! Вы выполнили все квесты! Победа!")
+                    self.player.game_over = True
+                    self.player.add_event_record(event_type, event, chosen_choice, outcome, status_changes, quest_changes)
+                    return
+            else:
+                print(f"Условия квеста '{current_quest.name}' не выполнены.")
+
+        if outcome.fail_quest and current_quest:
+            self.player.fail_quest(current_quest)
+            quest_changes.append(f"Квест '{current_quest.name}' провален!")
+            print(f"Квест '{current_quest.name}' провален.")
+
         if outcome.add_quest:
-            quest = self.all_quests.get(outcome.add_quest)
-            if quest:
-                self.player.add_quest(quest)
-                added_quest_id = outcome.add_quest
-                print(f"Новый квест добавлен в стек: {quest.name}")
-            else:
-                print(f"Квест с id '{outcome.add_quest}' не найден!")
+            quest_id = outcome.add_quest
+            if quest_id in self.quests_db:
+                new_quest = Quest.from_data(self.quests_db[quest_id])
+                self.player.quest_stack.append(new_quest)
+                quest_changes.append(f"Добавлен квест: {new_quest.name}")
+                print(f"Новый квест: {new_quest.name} - {new_quest.description}")
 
-        # Проверка выполнения текущего квеста
-        self.check_and_update_quests()
+        self.player.add_event_record(event_type, event, chosen_choice, outcome, status_changes, quest_changes)
 
+        # После всех изменений выводим текущее состояние
         self.print_statuses("Обновлённые статусы")
-
-        self.player.add_event_record(event_type, event, chosen_choice, outcome,
-                                     outcome.status_changes, added_quest_id)
-
-        if self.player.check_all_quests_done():
-            print("Поздравляем! Вы выполнили все квесты и завершили игру!")
-            self.player.game_over = True
-
-    def check_and_update_quests(self):
-        """Проверяет, выполнен ли текущий квест, и если да, удаляет его (переходит к предыдущему)."""
-        while not self.player.check_all_quests_done():
-            if self.player.check_current_quest():
-                current = self.player.get_current_quest()
-                if current:
-                    print(f"Квест '{current.name}' выполнен! Переход к предыдущему квесту.")
-                # После удаления, проверяем следующий
-            else:
-                break  # текущий не выполнен, выходим
+        self.print_quests()
 
 
 # ------------------- Запуск -------------------
 
 if __name__ == "__main__":
     statuses_config = load_statuses_config("statuses.yaml")
-    quests = load_quests("quests")
+    quests_db = load_all_quests("quests")
     loader = EventLoader("events")
-    game = Game(loader, statuses_config, quests)
+    game = Game(loader, statuses_config, quests_db, "characters")
     game.start()

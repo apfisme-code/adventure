@@ -9,5 +9,6 @@ COPY game.py .
 COPY statuses.yaml .
 COPY events/ events/
 COPY quests/ quests/
+COPY characters/ characters/
 
 CMD ["python", "-u", "game.py"]

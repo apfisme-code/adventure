@@ -1,8 +1,10 @@
 id: cursed
 title: "Снять проклятие"
 description: "Избавьтесь от проклятия, найдя противоядие"
-condition:
-  condition: {"проклят": "==false"}   # условие выполнения – снять проклятие
+conditions:
+  - status: "проклят"
+    operator: "=="
+    value: false
 on_complete:
   мудрость: 2
   известность: 1

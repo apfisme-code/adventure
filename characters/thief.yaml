@@ -1,0 +1,12 @@
+name: "Вор"
+description: "Ловкий и скрытный, всегда ищет лёгкую наживу."
+start_city: "C"
+statuses:
+  богатство: 2
+  известность: 0
+  мудрость: 1
+  красноречие: 1
+  фехтование: false
+  взлом: true
+  проклят: false
+goal_quest: "initial_quest"

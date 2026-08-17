@@ -1,4 +1,7 @@
 id: initial_wealth
 name: "Стать богатым"
 description: "Накопите состояние, чтобы жить без забот."
-condition: {"богатство": ">=5"}   # условие выполнения
+conditions:
+  - status: "взлом"
+    operator: ">="
+    value: 5

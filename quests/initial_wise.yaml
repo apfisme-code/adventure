@@ -1,4 +1,7 @@
 id: initial_wise
 name: "Стать мудрым"
 description: "Обретите мудрость, чтобы давать советы королям."
-condition: {"мудрость": ">=4"}
+conditions:
+  - status: "мудрость"
+    operator: ">="
+    value: 4

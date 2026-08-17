@@ -1,0 +1,29 @@
+text: "Вы входите в древний храм. Жрец предлагает избавить вас от проклятия за пожертвование."
+is_goal_event: false
+tags:
+  - city
+  - столица
+requires: [{"проклят": "==true"}]   # событие доступно только если проклят
+choices:
+  - text: "Пожертвовать золото и снять проклятие"
+    requires: [{"богатство": ">=3"}]
+    outcomes:
+      - text: "Жрец провёл обряд, проклятие снято!"
+        success_level: success
+        status_changes:
+          проклят: false
+          богатство: -3
+        complete_quest: true   # завершает текущий квест, если его условия выполнены (проклят == false)
+  - text: "Попросить снять проклятие в обмен на услугу"
+    requires: [{"красноречие": ">=2"}]
+    outcomes:
+      - text: "Жрец согласился, но вы должны выполнить его поручение."
+        success_level: neutral
+        status_changes: {}
+        add_quest: "temple_quest"   # добавляет новый квест (можно создать)
+  - text: "Уйти, не доверяя жрецу"
+    requires: []
+    outcomes:
+      - text: "Вы покидаете храм, проклятие остаётся."
+        success_level: neutral
+        status_changes: {}
