@@ -122,13 +122,15 @@ class Outcome:
                  status_changes: Optional[Dict[str, Union[int, bool]]] = None,
                  add_quest: Optional[str] = None,
                  complete_quest: bool = False,
-                 next_event: Optional[str] = None):
+                 next_event: Optional[str] = None,
+                 fail_quest: bool = False):
         self.text = text
         self.success_level = success_level
         self.status_changes = status_changes or {}
         self.add_quest = add_quest
         self.complete_quest = complete_quest
-        self.next_event = next_event  # может быть id события или "tag:тег"
+        self.next_event = next_event
+        self.fail_quest = fail_quest
 
 
 class Choice:
@@ -226,8 +228,9 @@ class EventLoader:
                     changes = out.get("status_changes", {})
                     add_quest = out.get("add_quest")
                     complete_quest = out.get("complete_quest", False)
-                    next_event = out.get("next_event")  # строка или None
-                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, next_event))
+                    next_event = out.get("next_event")  # строка или None                    
+                    fail_quest = out.get("fail_quest", False)
+                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, next_event, fail_quest))
                 choices.append(Choice(choice_text, outcomes, choice_requires))
             return Event(event_id, text, choices, tags, is_goal, requires)
         except KeyError as e:
@@ -285,6 +288,8 @@ class Player:
         self.current_city = None  # будет установлен позже
         self.history: List[Dict] = []
         self.game_over = False
+        self.quests_completed = 0
+        self.quests_failed = 0
 
     def move_to(self, city: City):
         self.current_city = city
@@ -341,9 +346,29 @@ class Player:
             self.apply_status_changes(quest.on_complete["status_changes"])
         # Запоминаем, нужно ли добавить новый
         next_quest_id = quest.on_complete.get("add_quest")
-        # Удаляем текущий (он последний)
+        # Удаляем текущий
         self.quest_stack.pop()
+        self.quests_completed += 1
         # Добавляем новый
+        if next_quest_id and next_quest_id in self.quests_db:
+            new_quest = Quest.from_data(self.quests_db[next_quest_id], self.statuses_config)
+            self.quest_stack.append(new_quest)
+        return True
+
+    def fail_current_quest(self) -> bool:
+        quest = self.get_current_quest()
+        if quest is None:
+            return False
+        # Применяем on_fail
+        if "status_changes" in quest.on_fail:
+            self.apply_status_changes(quest.on_fail["status_changes"])
+        if "message" in quest.on_fail:
+            print(quest.on_fail["message"])
+        # Удаляем текущий
+        self.quest_stack.pop()
+        self.quests_failed += 1
+        # Добавляем новый квест, если указан (редко для провала)
+        next_quest_id = quest.on_fail.get("add_quest")
         if next_quest_id and next_quest_id in self.quests_db:
             new_quest = Quest.from_data(self.quests_db[next_quest_id], self.statuses_config)
             self.quest_stack.append(new_quest)
@@ -590,7 +615,15 @@ class Game:
                 self.print_statuses("Ваши статусы")
 
             # Обработка квестов
-            if outcome.complete_quest:
+            if outcome.fail_quest:
+                if self.player.fail_current_quest():
+                    print("Квест провален!")
+                    # Проверяем, не закончилась ли игра поражением
+                    if self.player.check_win_condition():
+                        self.player.game_over = True
+                        self.player.add_event_record(event_type, event, chosen_choice, outcome)
+                        return
+            elif outcome.complete_quest:
                 if self.player.complete_current_quest():
                     if self.player.check_win_condition():
                         print("Поздравляем! Вы выполнили все квесты! Победа!")
