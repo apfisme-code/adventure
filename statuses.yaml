@@ -1,3 +1,6 @@
+# Поддерживаются только числовые (numeric) и булевы (boolean) статусы.
+# Для числовых указываются min, max, default.
+# Для булевых — только default (true/false).
 statuses:
   богатство:
     type: numeric

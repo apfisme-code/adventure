@@ -10,7 +10,11 @@ from typing import List, Optional, Dict, Any, Tuple, Set, Union
 def load_statuses_config(filepath: str = "statuses.yaml") -> Dict[str, Dict]:
     with open(filepath, 'r', encoding='utf-8') as f:
         data = yaml.safe_load(f)
-    return data.get("statuses", {})
+    statuses = data.get("statuses", {})
+    for name, info in statuses.items():
+        if info["type"] not in ("numeric", "boolean"):
+            raise ValueError(f"Статус '{name}' имеет недопустимый тип: {info['type']}. Допустимы только numeric и boolean.")
+    return statuses
 
 def load_character(filepath: str) -> Dict:
     with open(filepath, 'r', encoding='utf-8') as f:
@@ -121,16 +125,12 @@ class Outcome:
     def __init__(self, text: str, success_level: str,
                  status_changes: Optional[Dict[str, Union[int, bool]]] = None,
                  add_quest: Optional[str] = None,
-                 complete_quest: bool = False,
-                 next_event: Optional[str] = None,
-                 fail_quest: bool = False):
+                 next_event: Optional[str] = None):
         self.text = text
         self.success_level = success_level
         self.status_changes = status_changes or {}
         self.add_quest = add_quest
-        self.complete_quest = complete_quest
         self.next_event = next_event
-        self.fail_quest = fail_quest
 
 
 class Choice:
@@ -161,21 +161,24 @@ class Event:
 class Quest:
     def __init__(self, quest_id: str, name: str, description: str,
                  conditions: List[Condition],
-                 on_complete: Dict, on_fail: Dict = None):
+                 fail_conditions: List[Condition] = None,
+                 on_complete: Dict = None, on_fail: Dict = None):
         self.id = quest_id
         self.name = name
         self.description = description
         self.conditions = conditions
+        self.fail_conditions = fail_conditions or []
         self.on_complete = on_complete or {}
         self.on_fail = on_fail or {}
 
     @staticmethod
     def from_data(data: Dict, statuses_config: Dict) -> 'Quest':
         conditions = [Condition.parse(c, statuses_config) for c in data.get("conditions", [])]
+        fail_conditions = [Condition.parse(c, statuses_config) for c in data.get("fail_conditions", [])]
         on_complete = data.get("on_complete", {})
         on_fail = data.get("on_fail", {})
         return Quest(data["id"], data["name"], data["description"],
-                     conditions, on_complete, on_fail)
+                     conditions, fail_conditions, on_complete, on_fail)
 
     def check_completion(self, player_statuses: Dict[str, Union[int, bool]]) -> bool:
         return all(c.check(player_statuses) for c in self.conditions)
@@ -212,29 +215,36 @@ class EventLoader:
 
     def _parse_event(self, data: Dict[str, Any], event_id: str) -> Optional[Event]:
         try:
-            text = data["text"]
-            is_goal = data.get("is_goal_event", False)
+            text = data.get("text")
+            if not text:
+                raise ValueError("Отсутствует поле 'text'")
+            choices_data = data.get("choices")
+            if not choices_data or not isinstance(choices_data, list):
+                raise ValueError("Поле 'choices' должно быть непустым списком")
             tags = data.get("tags", [])
             requires = self._parse_conditions(data.get("requires", []))
-            choices_data = data.get("choices", [])
             choices = []
             for choice_item in choices_data:
-                choice_text = choice_item["text"]
+                choice_text = choice_item.get("text")
+                if not choice_text:
+                    raise ValueError("Отсутствует поле 'text' у выбора")
+                outcomes_data = choice_item.get("outcomes")
+                if not outcomes_data or not isinstance(outcomes_data, list):
+                    raise ValueError(f"Поле 'outcomes' должно быть непустым списком для выбора '{choice_text}'")
                 choice_requires = self._parse_conditions(choice_item.get("requires", []))
-                outcomes_data = choice_item.get("outcomes", [])
                 outcomes = []
                 for out in outcomes_data:
-                    level = out["success_level"]
+                    level = out.get("success_level")
+                    if level not in ("fail", "neutral", "success"):
+                        raise ValueError(f"Некорректный success_level: {level}")
                     changes = out.get("status_changes", {})
                     add_quest = out.get("add_quest")
-                    complete_quest = out.get("complete_quest", False)
-                    next_event = out.get("next_event")  # строка или None                    
-                    fail_quest = out.get("fail_quest", False)
-                    outcomes.append(Outcome(out["text"], level, changes, add_quest, complete_quest, next_event, fail_quest))
+                    next_event = out.get("next_event")
+                    outcomes.append(Outcome(out["text"], level, changes, add_quest, next_event))
                 choices.append(Choice(choice_text, outcomes, choice_requires))
-            return Event(event_id, text, choices, tags, is_goal, requires)
-        except KeyError as e:
-            print(f"Ошибка в данных события {event_id}: отсутствует поле {e}")
+            return Event(event_id, text, choices, tags, data.get("is_goal_event", False), requires)
+        except Exception as e:
+            print(f"Ошибка в событии {event_id}: {e}")
             return None
 
     def _parse_conditions(self, raw_conditions: List[Dict[str, str]]) -> List[Condition]:
@@ -378,6 +388,25 @@ class Player:
         """Победа, если стек квестов пуст."""
         return len(self.quest_stack) == 0
 
+    def check_quest_auto(self):
+        """Проверяет текущий квест: если условия выполнены – завершает, если есть on_fail – проваливает."""
+        quest = self.get_current_quest()
+        if quest is None:
+            self.game_over = True
+            return
+        # Проверяем условия на успех
+        if quest.check_completion(self.statuses):
+            self.complete_current_quest()
+            print(f"Квест '{quest.name}' выполнен!")
+            return
+        # Проверяем условия на провал (если есть)
+        if hasattr(quest, 'fail_conditions') and quest.fail_conditions:
+            if all(c.check(self.statuses) for c in quest.fail_conditions):
+                self.fail_current_quest()
+                print(f"Квест '{quest.name}' провален!")
+        
+        if self.check_win_condition():
+            self.game_over = True
 
 class Game:
 
@@ -446,6 +475,28 @@ class Game:
         else:
             print("Нет активных квестов. Победа!")
 
+    def validate_references(self):
+        """Проверяет, что все add_quest и next_event ссылаются на существующие объекты."""
+        errors = []
+        for event_id, event in self.loader._id_cache.items():
+            for choice in event.choices:
+                for outcome in choice.outcomes:
+                    if outcome.add_quest and outcome.add_quest not in self.quests_db:
+                        errors.append(f"Событие '{event_id}' ссылается на несуществующий квест: {outcome.add_quest}")
+                    if outcome.next_event:
+                        if outcome.next_event.startswith("tag:"):
+                            tag = outcome.next_event[4:]
+                            if not self.loader.get_events_by_tag(tag):
+                                errors.append(f"Событие '{event_id}' ссылается на несуществующий тег: {tag}")
+                        else:
+                            if not self.loader.get_event_by_id(outcome.next_event):
+                                errors.append(f"Событие '{event_id}' ссылается на несуществующее событие: {outcome.next_event}")
+        if errors:
+            print("Обнаружены ошибки в ссылках:")
+            for err in errors:
+                print(f"  - {err}")
+            print("Игра может работать некорректно.")
+
     def start(self):
         # Загружаем всех персонажей
         char_files = glob.glob(os.path.join(self.characters_dir, "*.yaml")) + \
@@ -464,6 +515,8 @@ class Game:
             self.player.current_city = self.cities[start_city_name]
         else:
             self.player.current_city = random.choice(list(self.cities.values()))
+
+        self.validate_references()
 
         self.current_edge_tag = None
 
@@ -609,31 +662,11 @@ class Game:
                     if isinstance(delta, bool):
                         print(f"{status}: {'да' if new_val else 'нет'} (было: {'да' if old_val else 'нет'})")
                     else:
-                        print(f"{status}: {old_val} → {new_val} ({delta:+d})")
+                        print(f"{status}: {old_val} → {new_val} ({delta:+d})")                    
                 self.print_statuses("Обновлённые статусы")
+                self.player.check_quest_auto()
             else:
                 self.print_statuses("Ваши статусы")
-
-            # Обработка квестов
-            if outcome.fail_quest:
-                if self.player.fail_current_quest():
-                    print("Квест провален!")
-                    # Проверяем, не закончилась ли игра поражением
-                    if self.player.check_win_condition():
-                        self.player.game_over = True
-                        self.player.add_event_record(event_type, event, chosen_choice, outcome)
-                        return
-            elif outcome.complete_quest:
-                if self.player.complete_current_quest():
-                    if self.player.check_win_condition():
-                        print("Поздравляем! Вы выполнили все квесты! Победа!")
-                        self.player.game_over = True
-                        self.player.add_event_record(event_type, event, chosen_choice, outcome)
-                        return
-                else:
-                    quest = self.player.get_current_quest()
-                    if quest is not None:
-                        print(f"Условия квеста '{quest.name}' не выполнены.")
 
             if outcome.add_quest:
                 quest_id = outcome.add_quest
